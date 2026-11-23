@@ -29,8 +29,22 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
+}
+
+dependencies {
+    // google_mlkit_text_recognition declares every script — Chinese, Devanagari,
+    // Japanese, Korean — as `compileOnly`, so the app has to pull in the model it
+    // actually uses. Without this the Chinese recogniser is absent at runtime
+    // (NoClassDefFoundError) and R8 fails on the dangling reference.
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
 
 kotlin {
