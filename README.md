@@ -29,8 +29,8 @@ you can select, re-strength or delete.
 
 ## Why another one
 
-- **Nothing leaves the device.** The release build asks for no network
-  permission at all. There is no account, no analytics, no cloud sync.
+- **Nothing leaves the device.** The release build never requests the
+  `INTERNET` permission. There is no account, no analytics, no cloud sync.
 - **Masks are objects, not pixels.** Mosaic, blur, and solid patches stay
   separate layers with their own strength and geometry.
 - **Text detection is offline.** Android uses ML Kit's bundled Chinese + Latin
@@ -52,7 +52,7 @@ you can select, re-strength or delete.
 | Editing | Undo/redo, per-mask hide, delete, clear all, hold-to-compare |
 | Canvas | Pinch zoom, wheel zoom, double-tap zoom, middle-drag pan |
 | Export | JPEG (quality 60–100) or PNG, gallery or file picker |
-| Privacy | No network permission, no backup, EXIF removed |
+| Privacy | No `INTERNET` permission, no backup, EXIF removed |
 | Interface | Material 3, light/dark, English and 简体中文 |
 
 ## Install
@@ -115,9 +115,12 @@ lib/
 ## Privacy
 
 Velatus has no servers. The Android release manifest explicitly removes the
-`INTERNET` permission, so even an accidental network call would fail. Backups
-are disabled. Export re-encodes pixels and therefore drops all EXIF metadata,
-including GPS.
+`INTERNET` permission, so even an accidental network call would fail. One
+network-related entry is left: `ACCESS_NETWORK_STATE`, declared by ML Kit. It
+can only report whether a connection exists — it cannot send or receive data.
+
+Backups are disabled. Export re-encodes pixels and therefore drops all EXIF
+metadata, including GPS.
 
 Verify it yourself:
 
