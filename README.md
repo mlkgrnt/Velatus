@@ -81,6 +81,11 @@ Requirements: Flutter 3.50+, Android SDK 36, JDK 21. Windows builds need
 Visual Studio 2022 with the Desktop development with C++ workload and the
 Windows 10/11 SDK.
 
+Release APKs are signed with the debug key committed at
+`android/app/debug.keystore`. That is the standard, public Android debug key —
+it exists so a sideloaded build can be upgraded in place instead of failing with
+a signature mismatch. Generate a private key before publishing to a store.
+
 ## How it works
 
 Velatus keeps two copies of the image: a preview capped at 2400 px for

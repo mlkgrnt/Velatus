@@ -9,6 +9,21 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    signingConfigs {
+        // Committed on purpose. Every machine and CI runner generates its own
+        // debug key by default, which means two builds of the same version have
+        // different signatures and Android refuses to upgrade in place. This
+        // key only signs sideload builds — it is the standard, public Android
+        // debug key, not a secret. Swap in a real release key before publishing
+        // to a store.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -26,8 +41,9 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Signed with the committed debug key so sideloaded builds can be
+            // upgraded in place. Replace it with a private release key before
+            // shipping through a store.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
