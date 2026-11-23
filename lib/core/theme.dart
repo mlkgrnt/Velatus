@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Brand seed. A muted indigo, chosen to feel calm rather than alarming.
@@ -38,6 +39,16 @@ ThemeData buildTheme(Brightness brightness) {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
+      // The bar is transparent, so Flutter cannot work out the status bar icon
+      // colour on its own: without this the clock and battery stay white on a
+      // light background and disappear.
+      systemOverlayStyle: (isDark
+              ? SystemUiOverlayStyle.light
+              : SystemUiOverlayStyle.dark)
+          .copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
       titleTextStyle: base.textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,

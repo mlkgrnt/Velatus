@@ -34,7 +34,12 @@ class ExportSaver {
             error: 'Gallery permission denied',
           );
         }
-        await Gal.putImageBytes(result.bytes, name: name);
+        // `gal` derives the extension from the bytes and appends it to the
+        // display name, so it must be given the bare name.
+        await Gal.putImageBytes(
+          result.bytes,
+          name: ImageExporter.suggestedBaseName(),
+        );
         return const ExportSaveResult(ok: true, location: 'Gallery');
       }
       if (Platform.isAndroid) {

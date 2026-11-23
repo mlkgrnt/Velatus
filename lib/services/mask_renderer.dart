@@ -14,15 +14,20 @@ class MaskRenderer {
   const MaskRenderer._();
 
   /// Block edge in pixels for a given strength, relative to the shorter side of
-  /// the image. Strength 0.55 on a 2000 px photo ≈ 26 px blocks.
+  /// the image.
+  ///
+  /// The curve is deliberately aggressive: a redaction has to dissolve glyphs,
+  /// not merely roughen them. At the default 0.65 strength a 1080 px screenshot
+  /// gets ~29 px blocks, which is wider than a line of body text and therefore
+  /// unreadable; the old, gentler curve left phone numbers legible.
   static int mosaicBlockPx(double strength, double shortSide) {
-    final relative = 0.003 + 0.018 * strength.clamp(0.0, 1.0);
+    final relative = 0.007 + 0.030 * strength.clamp(0.0, 1.0);
     return math.max(3, (shortSide * relative).round());
   }
 
   /// Gaussian sigma in pixels for a given strength.
   static double blurSigmaPx(double strength, double shortSide) {
-    final relative = 0.0015 + 0.012 * strength.clamp(0.0, 1.0);
+    final relative = 0.003 + 0.018 * strength.clamp(0.0, 1.0);
     return math.max(1.0, shortSide * relative);
   }
 
@@ -171,15 +176,17 @@ class MaskRenderer {
     final path = region.toPath(imageRect);
     if (path.getBounds().isEmpty && !region.isStroke) return;
 
-    final baseWidth =
-        region.isStroke ? region.size * imageRect.shortestSide : 0.0;
+    // A brush stroke is already as wide as the mask itself. Outlining it at
+    // that width would paint over the mosaic the user is trying to inspect, so
+    // strokes get a thin centreline instead of a fat ring.
+    final baseWidth = region.isStroke ? 1.5 : 2.5;
 
     // Halo, so the outline survives on both light and dark photos.
     canvas.drawPath(
       path,
       ui.Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = baseWidth + 5
+        ..strokeWidth = baseWidth + 2.5
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..color = const Color(0xE6FFFFFF)
@@ -189,7 +196,7 @@ class MaskRenderer {
       path,
       ui.Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = baseWidth + 2.5
+        ..strokeWidth = baseWidth
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..color = accent,

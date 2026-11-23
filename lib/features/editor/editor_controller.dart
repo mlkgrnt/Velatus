@@ -33,7 +33,7 @@ class EditorController extends ChangeNotifier {
   EditorTool _tool = EditorTool.brush;
   MaskStyle _style = MaskStyle.mosaic;
   double _brushSize = 0.055;
-  double _strength = 0.55;
+  double _strength = 0.65;
   Color _solidColor = const Color(0xFF14161C);
   bool _showOriginal = false;
   bool _busy = false;

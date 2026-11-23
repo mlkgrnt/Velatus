@@ -93,9 +93,7 @@ class ImageExporter {
         raw.offsetInBytes,
         raw.lengthInBytes,
       );
-      final encoded = await Isolate.run(
-        () => _encode(rgba, width, height, format, quality),
-      );
+      final encoded = await _encodeOffThread(rgba, width, height, format, quality);
       return ExportResult(
         bytes: encoded,
         width: width,
@@ -106,6 +104,24 @@ class ImageExporter {
       cache.dispose();
       full.dispose();
     }
+  }
+
+  /// Encodes on a worker isolate.
+  ///
+  /// This lives in its own method on purpose: `Isolate.run` sends the closure
+  /// *and everything it captured* to the new isolate, and `dart:ui` objects are
+  /// not sendable. Building the closure in a scope that holds the decoded image
+  /// or the texture cache makes every export fail with "Illegal argument in
+  /// isolate message". Here the captured context is just the pixel buffer and a
+  /// few numbers.
+  static Future<Uint8List> _encodeOffThread(
+    Uint8List rgba,
+    int width,
+    int height,
+    ExportFormat format,
+    int quality,
+  ) {
+    return Isolate.run(() => _encode(rgba, width, height, format, quality));
   }
 
   static Uint8List _encode(
@@ -130,11 +146,17 @@ class ImageExporter {
     );
   }
 
-  static String suggestedName(ExportFormat format, {DateTime? now}) {
+  /// File name without the extension. `gal` appends the extension itself and
+  /// produces `photo.jpg.jpg` if it is already there.
+  static String suggestedBaseName({DateTime? now}) {
     final t = now ?? DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
     return 'velatus_${t.year}${two(t.month)}${two(t.day)}_'
-        '${two(t.hour)}${two(t.minute)}${two(t.second)}.${format.extension}';
+        '${two(t.hour)}${two(t.minute)}${two(t.second)}';
+  }
+
+  static String suggestedName(ExportFormat format, {DateTime? now}) {
+    return '${suggestedBaseName(now: now)}.${format.extension}';
   }
 
   static String humanSize(int bytes) {

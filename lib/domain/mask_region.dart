@@ -21,7 +21,7 @@ class MaskRegion {
     required this.shape,
     required this.points,
     this.size = 0.05,
-    this.strength = 0.55,
+    this.strength = 0.65,
     this.color = const Color(0xFF12141A),
     this.visible = true,
   });

@@ -366,7 +366,7 @@ class _CompareButton extends StatelessWidget {
         icon: Icon(
           controller.showOriginal
               ? Icons.visibility_rounded
-              : Icons.compare_outlined,
+              : Icons.visibility_outlined,
         ),
         tooltip: l10n.compare,
       ),
