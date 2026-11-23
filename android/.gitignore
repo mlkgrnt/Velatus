@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Velatus distributes sideload builds, so the standard public Android debug key
+# is committed on purpose (see the README). It is not a private key.
+!app/debug.keystore
