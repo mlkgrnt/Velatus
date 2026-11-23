@@ -1,0 +1,143 @@
+{
+  "@@locale": "zh",
+  "appName": "隐格",
+  "appNameZh": "Velatus",
+  "tagline": "该藏起来的，就藏好。",
+  "taglineSub": "本地优先的截图与照片打码工具。",
+  "cancel": "取消",
+  "delete": "删除",
+  "done": "完成",
+  "close": "关闭",
+  "save": "保存",
+  "share": "分享",
+  "settings": "设置",
+  "about": "关于",
+  "retry": "重试",
+  "openImage": "打开图片",
+  "pickFromGallery": "从相册选择",
+  "pickFromFiles": "选择文件",
+  "dropHint": "把图片拖到这里",
+  "dropSubtitle": "或点击浏览 · 支持 JPG、PNG、WebP、BMP",
+  "featureLocalTitle": "全程不出本机",
+  "featureLocalBody": "不上传、不登录、不统计。应用没有联网权限。",
+  "featureLayersTitle": "打码可以反悔",
+  "featureLayersBody": "每一处遮挡都是独立对象，随时能改回来。",
+  "featureOcrTitle": "离线找文字",
+  "featureOcrBody": "自动识别敏感文字，一键盖住，全部在本机完成。",
+  "recent": "最近打开",
+  "clearRecent": "清空",
+  "untitled": "未命名",
+  "editorTitle": "编辑",
+  "undo": "撤销",
+  "redo": "重做",
+  "compare": "按住对比",
+  "export": "导出",
+  "layers": "打码层",
+  "fitToScreen": "适应窗口",
+  "toolBrush": "涂抹",
+  "toolRect": "矩形",
+  "toolEllipse": "椭圆",
+  "toolLasso": "套索",
+  "toolSelect": "选择",
+  "maskMosaic": "马赛克",
+  "maskBlur": "模糊",
+  "maskSolid": "色块",
+  "strength": "强度",
+  "size": "大小",
+  "color": "颜色",
+  "brushHint": "在需要遮住的区域上涂抹",
+  "rectHint": "拖动框选一个区域",
+  "ellipseHint": "拖动画一个椭圆",
+  "lassoHint": "沿着区域边缘圈选",
+  "selectHint": "点选一处打码来调整或删除",
+  "deleteMask": "删除这处打码",
+  "maskCount": "{count, plural, =0{暂无打码} other{{count} 处打码}}",
+  "@maskCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "emptyLayers": "还没有遮挡",
+  "emptyLayersBody": "选一个工具，在图片上拖动即可。",
+  "ocrAction": "识别文字",
+  "ocrScanning": "正在识别文字…",
+  "ocrFound": "发现 {count} 处文字",
+  "@ocrFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ocrNone": "没有找到文字",
+  "ocrApplyAll": "全部盖住",
+  "ocrUnavailable": "文字识别目前仅在 Android 版提供。",
+  "ocrFailed": "文字识别失败",
+  "compareHint": "按住查看原图",
+  "resetView": "复位视图",
+  "exportTitle": "导出",
+  "format": "格式",
+  "quality": "质量",
+  "metadata": "元数据",
+  "metadataNote": "EXIF（位置、设备、时间）会被彻底移除。",
+  "resolution": "分辨率",
+  "originalSize": "原始尺寸",
+  "exportSave": "保存到本机",
+  "exportGallery": "保存到相册",
+  "exported": "图片已保存",
+  "exportedTo": "已保存到 {path}",
+  "@exportedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "保存失败",
+  "exporting": "正在渲染…",
+  "appearance": "外观",
+  "themeSystem": "跟随系统",
+  "themeLight": "浅色",
+  "themeDark": "深色",
+  "language": "语言",
+  "languageSystem": "跟随系统",
+  "privacy": "隐私",
+  "privacyBody": "隐格完全在本机处理图片，没有账号系统，正式版不申请联网权限。",
+  "openSource": "开源",
+  "licenses": "开源许可",
+  "aboutBody": "一个安静的小工具，专门盖住不该被看见的东西。",
+  "openFailed": "无法打开这张图片",
+  "unsupportedFormat": "不支持的格式",
+  "storageDenied": "存储权限被拒绝",
+  "imageInfo": "{width} × {height}",
+  "@imageInfo": {
+    "placeholders": {
+      "width": {
+        "type": "int"
+      },
+      "height": {
+        "type": "int"
+      }
+    }
+  },
+  "languageEnglish": "English",
+  "languageChinese": "简体中文",
+  "layersHint": "新打码在最上层",
+  "tapToEdit": "点击编辑",
+  "selected": "已选中",
+  "apply": "应用",
+  "clearAll": "全部清除",
+  "clearAllConfirm": "要移除这张图上的所有打码吗？",
+  "maskStyle": "样式",
+  "brushSize": "笔刷大小",
+  "blurNote": "模糊强度会随图片尺寸缩放，导出与预览一致。",
+  "exifStripped": "已清除 EXIF",
+  "hide": "隐藏",
+  "show": "显示",
+  "footerNote": "MIT · 无网络 · 无账号",
+  "leaveTitle": "还没导出，确定离开？",
+  "leaveBody": "打码不会保存为工程文件。想保留结果的话，请先导出图片。",
+  "leave": "离开"
+}
