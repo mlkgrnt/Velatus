@@ -4,6 +4,30 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] — 2026-11-25
+
+### Added
+
+- **Avatars in one column now share exactly the same left edge and the same
+  side length.** A single window is a noisy measurement: a pale edge or a
+  different sweep size can leave one avatar boxed a few pixels short or
+  off-centre. The detector groups the marginal boxes into columns, takes the
+  median x and median side, and rewrites every box in that column to the
+  shared geometry while keeping its row centre. It runs twice — once on the
+  seeds, so the template size and the mirrored margin come from a column
+  consensus rather than one lucky window, and once on the final output.
+
+### Changed
+
+- The new pass is pure bookkeeping over the dozen boxes already found: no
+  extra image scan and no extra shape check. A/B on the same 360×640
+  benchmark measured 17.4–18.6 ms/run before and 17.7–18.4 ms/run after
+  (original flood-fill detector: 14.5 ms). On the reported 540×640 real
+  screenshot the 9 boxes are unchanged and still all 62×62 squares.
+- Regression tests now assert column alignment for every synthetic chat, plus
+  a column with one odd-sized read that used to emit a lone 58 px box among
+  49 px ones. Full suite: 93 tests.
+
 ## [0.4.4] — 2026-11-24
 
 ### Fixed

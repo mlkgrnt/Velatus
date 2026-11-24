@@ -151,6 +151,39 @@ void expectOnlyAvatars(List<Rect> boxes, int count) {
       reason: 'a detected avatar box must be square in pixel space',
     );
   }
+  expectAlignedColumns(boxes);
+}
+
+/// The chat-layout prior: one column of avatars is stamped with exactly the
+/// same left edge and exactly the same side length. A single window is a noisy
+/// measurement; the column consensus is not.
+void expectAlignedColumns(List<Rect> boxes) {
+  final columns = <bool, List<Rect>>{};
+  for (final box in boxes) {
+    (columns[box.center.dx < 0.5] ??= <Rect>[]).add(box);
+  }
+  for (final column in columns.values) {
+    if (column.length < 2) continue;
+    final left = column.first.left * 360;
+    final side = column.first.width * 360;
+    for (final box in column) {
+      expect(
+        box.left * 360,
+        closeTo(left, 0.6),
+        reason: 'avatars in one column must share the same left edge',
+      );
+      expect(
+        box.width * 360,
+        closeTo(side, 0.6),
+        reason: 'avatars in one column must have the same side length',
+      );
+      expect(
+        box.width * 360,
+        closeTo(box.height * 640, 1.5),
+        reason: 'a detected avatar box must be square in pixel space',
+      );
+    }
+  }
 }
 
 void main() {
@@ -243,6 +276,8 @@ void main() {
         reason: 'only the margins should produce avatar boxes',
       );
     }
+    // Each margin is its own column; both must be internally consistent.
+    expectAlignedColumns(boxes);
   });
 
   test('a lone outgoing avatar is recovered from the mirrored margin', () {
@@ -311,6 +346,32 @@ void main() {
     for (final box in pale) {
       expect(box.width * 360, closeTo(box.height * 640, 1.5));
     }
+    // The gentle channel finds sparse strokes, so its boxes are the most
+    // likely to drift. The column prior must still pull them into line.
+    expectAlignedColumns(boxes);
+  });
+
+  test('one odd-sized read is restored to the column geometry', () {
+    // Four avatars are read at the sweep's 49 px window; the larger one in
+    // the middle used to come out as a lone 58 px box. A chat column never
+    // mixes sizes, so the column consensus must win: same left edge, same
+    // side length for all five, with the odd avatar still covered.
+    final chat = _Chat();
+    for (var i = 0; i < 5; i++) {
+      final top = 40 + i * 118;
+      chat.square(14, top, i == 2 ? 52 : 40, 60, 130, 200);
+      chat.bubble(top);
+    }
+    final boxes = _find(chat);
+    expect(boxes, hasLength(5));
+    expectAlignedColumns(boxes);
+    for (final box in boxes) {
+      expect(box.left * 360, lessThan(60));
+    }
+    final middle = boxes.where(
+      (r) => r.top * 640 > 240 && r.top * 640 < 330,
+    );
+    expect(middle, hasLength(1), reason: 'the odd-sized avatar is still boxed');
   });
 
   test('a bare page of text produces no candidates', () {

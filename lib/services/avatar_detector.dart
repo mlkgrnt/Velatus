@@ -29,9 +29,14 @@ import 'dart:ui';
 ///     side become a template, and the whole image is swept along those two
 ///     columns. This is what recovers an avatar that appears only once — the
 ///     outgoing one on the right — which no repetition rule can ever find.
+///  5. **Column geometry.** Avatars in one column are stamped with the same
+///     left edge and the same side length. The median of each column replaces
+///     every individual measurement, both before the sweep (a steadier seed
+///     and mirrored margin) and on the way out (no cropped or drifting box).
 ///
-/// Cost stays O(pixels) plus a small O(candidates²) for clustering. Everything
-/// runs in a background isolate.
+/// Cost stays O(pixels) plus a small O(candidates²) for clustering; the column
+/// pass is O(candidates log candidates) over a dozen boxes. Everything runs in
+/// a background isolate.
 class AvatarDetector {
   const AvatarDetector._();
 
@@ -71,12 +76,17 @@ class AvatarDetector {
     // Only a marginal box is confident enough to be a template. The clustered
     // set can still contain a "regular column" in the middle of the bubbles;
     // its median x would drag the mirrored anchor away from the real margin.
-    final seeds = _marginal(p, clustered);
+    // Aligning the column *before* the sweep means the seed size and the
+    // mirrored margin are a column consensus rather than one lucky window.
+    final seeds = _alignColumns(p, _marginal(p, clustered));
     if (seeds.isEmpty) return const <Rect>[];
     for (final found in _reinforce(p, seeds)) {
       _add(seeds, found);
     }
-    return _finish(p, seeds);
+    // The sweep can still produce a slightly different size or x for a pale
+    // avatar. The column prior is stronger than any single window: enforce it
+    // once more on the way out so every box in a column is identical.
+    return _finish(p, _alignColumns(p, seeds));
   }
 
   // ------------------------------------------------------------------ sweep
@@ -522,6 +532,92 @@ class AvatarDetector {
       final centre = (box.rect.left + box.rect.width / 2) / p.width;
       if (centre > 0.18 && centre < 0.82) continue;
       out.add(box);
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------- column geometry
+
+  /// Enforces the strongest chat-layout prior: every avatar in one column has
+  /// the *same* left edge and the *same* side length.
+  ///
+  /// A single window is a noisy measurement — a pale edge, a clipped blob or
+  /// a different sweep size can leave it a few pixels short or off-centre.
+  /// The median over its column is not. Restoring that shared geometry is what
+  /// turns "we read the avatar but did not box it fully" into a complete box.
+  /// It also feeds the reinforcement pass: a consensus seed gives a much more
+  /// accurate mirrored margin than any one lucky window.
+  ///
+  /// Pure bookkeeping over the handful of boxes already found. No image scan,
+  /// no extra [_verify], so the cost is invisible next to the integral passes.
+  static List<_Box> _alignColumns(_Pyramid p, List<_Box> boxes) {
+    if (boxes.length < 2) return boxes;
+
+    double median(List<double> values) {
+      values.sort();
+      return values[values.length ~/ 2];
+    }
+
+    // A "regular column" of text in the middle of the bubbles must never vote
+    // on an avatar's geometry. Keep those boxes exactly as they were.
+    final marginal = <_Box>[];
+    final untouched = <_Box>[];
+    for (final box in boxes) {
+      final centre = (box.rect.left + box.rect.width / 2) / p.width;
+      (centre < 0.18 || centre > 0.82 ? marginal : untouched).add(box);
+    }
+    if (marginal.length < 2) return boxes;
+
+    final sorted = [...marginal]
+      ..sort((a, b) => a.rect.left.compareTo(b.rect.left));
+    final columns = <List<_Box>>[];
+    for (final box in sorted) {
+      if (columns.isEmpty) {
+        columns.add([box]);
+        continue;
+      }
+      // Compare with the group's *first* box: comparing with the last one
+      // would let a chain of slightly drifting x values walk a column away.
+      final head = columns.last.first;
+      final slack = math.max(6.0, head.rect.width * 0.35);
+      if ((box.rect.left - head.rect.left).abs() <= slack) {
+        columns.last.add(box);
+      } else {
+        columns.add([box]);
+      }
+    }
+
+    final out = <_Box>[...untouched];
+    for (final column in columns) {
+      if (column.length < 2) {
+        out.addAll(column);
+        continue;
+      }
+      final left = median([for (final b in column) b.rect.left]).round();
+      final rawSize = median([for (final b in column) b.rect.width]).round();
+      final size = rawSize.clamp(10, math.min(p.width, p.height)).toInt();
+      final x = left.clamp(0, p.width - size).toInt();
+      for (final box in column) {
+        // The row position is real evidence; only the horizontal geometry and
+        // the side length come from the column consensus.
+        final cy = box.rect.top + box.rect.height / 2;
+        final top = (cy - size / 2)
+            .round()
+            .clamp(0, math.max(0, p.height - size))
+            .toInt();
+        out.add(
+          _Box(
+            Rect.fromLTWH(
+              x.toDouble(),
+              top.toDouble(),
+              size.toDouble(),
+              size.toDouble(),
+            ),
+            box.score,
+            corner: box.corner,
+          ),
+        );
+      }
     }
     return out;
   }

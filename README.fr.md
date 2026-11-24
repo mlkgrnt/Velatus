@@ -48,7 +48,7 @@ la précédente au lieu d'empiler une couche de plus.
 | | comment |
 | --- | --- |
 | Texte | ML Kit chinois + latin hors ligne, modèle intégré (**Android uniquement**) |
-| Avatars de discussion | Traitement d'image en Dart pur : normalisation adaptative du premier plan et images intégrales, forme par projection (carré, arrondi ou rond), DFT à un bin pour le rythme de la colonne, puis un gabarit de référence qui balaie les deux marges symétriques pour retrouver les avatars n'apparaissant qu'une fois |
+| Avatars de discussion | Traitement d'image en Dart pur : normalisation adaptative du premier plan et images intégrales, forme par projection (carré, arrondi ou rond), DFT à un bin pour le rythme de la colonne, un gabarit de référence qui balaie les deux marges symétriques pour retrouver les avatars n'apparaissant qu'une fois, puis une normalisation par colonne imposant à tous les cadres d'une colonne le même bord gauche et le même côté |
 | QR codes | `zxing2`, environ 200 Ko de Dart pur, qui calcule les limites réelles du symbole |
 
 Deux précisions honnêtes : il reconnaît du *texte*, pas du *texte sensible* —
