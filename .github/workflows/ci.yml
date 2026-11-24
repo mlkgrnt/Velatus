@@ -63,7 +63,20 @@ jobs:
       - name: Package
         shell: pwsh
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath velatus-windows.zip
+      # A Flutter Windows build is a folder (engine DLL + data/), so a truly
+      # single-file download is a self-extracting launcher. It unpacks once to
+      # %LOCALAPPDATA%\Velatus\<version> and then runs the real exe. No third
+      # party packer, no installer, and no admin rights needed.
+      - name: Build single-file portable exe
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content pubspec.yaml -Raw), '(?m)^version:\s*(\d+\.\d+\.\d+)').Groups[1].Value
+          ./tool/windows_portable/package.ps1 -ReleaseDir build/windows/x64/runner/Release -Version $version -Out "velatus-$version-windows.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: velatus-windows
           path: velatus-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velatus-windows-portable
+          path: velatus-*-windows.exe
