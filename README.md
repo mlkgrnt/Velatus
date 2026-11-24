@@ -44,7 +44,7 @@ replaces the previous set instead of piling another layer on top.
 | | how |
 | --- | --- |
 | Text | ML Kit Chinese + Latin text recognition, bundled offline (**Android only**) |
-| Chat avatars | Pure-Dart image processing: integral-image colour and edge contrast, projection shape checks (square, rounded or round), and a single-bin DFT that recovers the regular rhythm of a chat column |
+| Chat avatars | Pure-Dart image processing: adaptive foreground normalisation and integral images, projection shape checks (square, rounded or round), a single-bin DFT for the column rhythm, then a seed template that sweeps both mirrored margins to recover avatars appearing only once |
 | QR codes | `zxing2`, about 200 KB of pure Dart, finds the real symbol bounds |
 
 Two honest notes: it recognises *text*, not *sensitive text* — you decide what

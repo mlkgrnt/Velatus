@@ -4,56 +4,72 @@ import 'dart:ui';
 
 /// Finds chat avatars with plain image processing — no model, no plugin.
 ///
-/// The old detector asked for "a busy square inside a perfectly flat ring" and
-/// then demanded one filled blob. That misses exactly the avatars people use:
-/// a smooth gradient with a letter, a square photo, or a rounded square with a
-/// light border. It also made "busy enough" an absolute threshold, which is
-/// why a 720 px screenshot found fewer avatars than a 480 px one — resizing
-/// softens the very gradients it was counting.
+/// The layout of a chat screenshot is a strong prior: a status bar, an app bar,
+/// message bubbles, an input box — and avatars that only ever sit in the left
+/// or right margin, all at the same size. The detector uses that prior in four
+/// stages:
 ///
-/// Three classical signals replace it:
-///
-///  1. **Integral images** of luminance, chroma and a 2-tap central-difference
-///     gradient (a cheap Sobel). A sliding window then costs a fixed handful
-///     of integer lookups, whatever its size.
-///  2. **Shape by projection.** For each surviving window, subtract the local
-///     background colour and look at the row/column histograms of what is
-///     left. A disc, a square and a rounded square all produce one long
-///     connected run covering most of the window; a line of text produces
-///     several short runs and a much lower fill. Corner occupancy tells the
-///     three shapes apart — and all three are accepted.
+///  1. **Adaptive pre-processing.** The dominant page colour is estimated once
+///     from a colour histogram; every pixel is then turned into its distance
+///     from that colour and a binary foreground map. Integral images of
+///     luminance, chroma, a 2-tap central-difference gradient, colour distance
+///     and foreground make every later window query O(1). A quiet-row scan also
+///     finds the flat status/app/input strips, so the seed sweep skips them.
+///  2. **Shape by projection.** A disc, a square and a rounded square all give
+///     one long connected run covering most of their bounding box; a line of
+///     text gives a comb. Corner occupancy tells the three apart — all three
+///     are accepted.
 ///  3. **Regularity in the frequency domain.** Chat avatars repeat down a
-///     column (or along a row in a member grid). The pitch comes from the
-///     gaps, is cross-checked with a single-bin DFT (Goertzel) of the column's
-///     vertical signal, and is used to re-test positions the coarse pass
-///     missed. This is what fixes recall.
+///     column. The pitch comes from the gaps, is cross-checked with a
+///     single-bin DFT (Goertzel), and positions bracketed by two confirmed
+///     avatars are re-tested.
+///  4. **Seed-driven reinforcement.** Once one high-confidence avatar exists,
+///     stop treating every position as an independent guess. Its size, its
+///     margin, a 4×4 colour signature and the *mirrored* margin on the other
+///     side become a template, and the whole image is swept along those two
+///     columns. This is what recovers an avatar that appears only once — the
+///     outgoing one on the right — which no repetition rule can ever find.
 ///
-/// Cost is O(pixels) for the integral images and the sweep, plus a small
-/// O(candidates²) for clustering. Everything runs in a background isolate.
+/// Cost stays O(pixels) plus a small O(candidates²) for clustering. Everything
+/// runs in a background isolate.
 class AvatarDetector {
   const AvatarDetector._();
 
   /// Longest side of the bitmap the detector works on.
-  ///
-  /// Slightly smaller than the old 720: the new cues (colour contrast and
-  /// projections) do not need the extra pixels, and the saved work pays for
-  /// the shape and rhythm passes so the whole scan stays in the same 10–30 ms
-  /// range as before.
   static const int analysisSide = 640;
+
+  /// Colour distance from the page background that counts as "content".
+  /// A white chat bubble is ~51 units from the usual light grey page, so 60
+  /// keeps bubbles as background while coloured avatars (hundreds of units)
+  /// stay firmly foreground.
+  static const double foregroundThreshold = 60.0;
 
   static List<Rect> find(Uint8List rgba, int width, int height) {
     if (width < 48 || height < 48) return const <Rect>[];
-    final pyramid = _Pyramid(rgba, width, height);
-    final coarse = _coarse(pyramid);
+    final p = _Pyramid(rgba, width, height);
+    final coarse = _coarse(p);
     if (coarse.isEmpty) return const <Rect>[];
 
     final verified = <_Box>[];
     for (final box in coarse) {
-      final checked = _verify(pyramid, box.rect, 1.0);
+      final checked = _verify(p, box.rect, 1.0);
       if (checked != null) verified.add(checked);
     }
     if (verified.isEmpty) return const <Rect>[];
-    return _regularize(pyramid, verified);
+
+    // Pixel-space boxes, so the reinforcement pass can reuse the same
+    // integral images instead of re-decoding anything.
+    final clustered = _regularizeBoxes(p, verified);
+    if (clustered.isEmpty) return const <Rect>[];
+    // Only a marginal box is confident enough to be a template. The clustered
+    // set can still contain a "regular column" in the middle of the bubbles;
+    // its median x would drag the mirrored anchor away from the real margin.
+    final seeds = _marginal(p, clustered);
+    if (seeds.isEmpty) return const <Rect>[];
+    for (final found in _reinforce(p, seeds)) {
+      _add(seeds, found);
+    }
+    return _finish(p, seeds);
   }
 
   // ------------------------------------------------------------------ sweep
@@ -62,13 +78,10 @@ class AvatarDetector {
     final w = p.width;
     final h = p.height;
     final short = math.min(w, h);
-    // A phone screenshot spends roughly 6–12 % of its width on an avatar; the
-    // extra scales cover tablets, contact lists and avatars inside forwards.
     final sizes = <int>{
       // 20 px windows were the source of most false positives: a bold glyph
       // cluster is exactly that size. On a 640 px analysis bitmap a real chat
-      // avatar is 30–55 px, so starting here costs no recall and saves a whole
-      // sweep.
+      // avatar is 30–55 px, so starting here costs no recall and saves a sweep.
       for (final fraction in const [0.08, 0.095, 0.115, 0.135, 0.16])
         math.max(14, (short * fraction).round()),
     };
@@ -143,7 +156,6 @@ class AvatarDetector {
     // Bucket by position *before* taking the best scores. Bold text outscores
     // a quiet gradient avatar, so a plain global top-N used to spend every
     // slot in one corner of the screenshot and lose the avatars elsewhere.
-    // Two winners per cell keep the sweep cheap but spatially fair.
     final cell = math.max(20, (short * 0.12).round());
     final buckets = <String, List<_Box>>{};
     for (final box in out) {
@@ -186,66 +198,46 @@ class AvatarDetector {
 
   /// Confirms one window really contains an avatar rather than a bit of text.
   ///
-  /// [strictness] below 1 is only used when re-testing a position predicted by
-  /// a confirmed rhythm; those get a slightly gentler threshold because their
-  /// location is already strong evidence.
+  /// The foreground map and distance integral image come from the adaptive
+  /// pre-processing pass, so the expensive per-pixel colour work happens once
+  /// for the whole image rather than once per candidate. [strictness] below 1
+  /// is only used for positions whose location is already strong evidence.
   static _Box? _verify(_Pyramid p, Rect rect, double strictness) {
     final w = p.width;
     final h = p.height;
-    final rgba = p.rgba;
     final x0 = rect.left.round();
     final y0 = rect.top.round();
     final size = rect.width.round();
     if (size < 10 || x0 < 0 || y0 < 0 || x0 + size > w || y0 + size > h) {
       return null;
     }
-    // The dominant page colour is the reference, not a thin local ring. A ring
-    // can be polluted by the bubble or a text line, which drags the reference
-    // into the middle and makes the entire bubble look like "content". A chat
-    // bubble is only ~20 units from the page colour, so it stays background;
-    // an avatar is far away from it.
-    final br = p.backgroundR;
-    final bg = p.backgroundG;
-    final bb = p.backgroundB;
-    // A white chat bubble is ~51 colour units away from the usual light grey
-    // page (#EDEDF0), and ~23 from a whiter one. Both must stay "background",
-    // otherwise the bubble itself becomes a solid square "avatar". Coloured
-    // avatars are hundreds of units away, so 60 still catches every one of
-    // them; the gentler settings are only for rhythm-predicted positions.
-    final threshold = 30.0 + 30.0 * strictness;
-    final rows = Int32List(size);
-    final cols = Int32List(size);
-    var covered = 0;
-    var distanceSum = 0;
-    var minX = size, maxX = -1, minY = size, maxY = -1;
-    for (var y = 0; y < size; y++) {
-      for (var x = 0; x < size; x++) {
-        final i = ((y0 + y) * w + x0 + x) * 4;
-        final distance =
-            (rgba[i] - br).abs() +
-            (rgba[i + 1] - bg).abs() +
-            (rgba[i + 2] - bb).abs();
-        distanceSum += distance;
-        if (distance > threshold) {
-          rows[y]++;
-          cols[x]++;
-          covered++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
+
     final area = size * size;
+    final covered = p.sum(p.iiForeground, x0, y0, x0 + size, y0 + size);
     final coverage = covered / area;
-    final meanDistance = distanceSum / area;
+    final meanDistance =
+        p.sum(p.iiDistance, x0, y0, x0 + size, y0 + size) / area;
     // Coverage 1.0 means the window is entirely inside one flat patch — no
-    // boundary to locate. It is exactly what a white bubble looks like when
-    // its ring is polluted by the text around it, so it has to be rejected;
-    // the spatial buckets above make sure a correctly sized window survives.
+    // boundary to locate. It is what a bubble looks like when its ring is
+    // polluted by text, so it has to be rejected.
     if (coverage < 0.50 * strictness || coverage > 0.995) return null;
     if (meanDistance < 55 * strictness) return null;
+
+    final rows = Int32List(size);
+    final cols = Int32List(size);
+    var minX = size, maxX = -1, minY = size, maxY = -1;
+    for (var y = 0; y < size; y++) {
+      final row = (y0 + y) * w + x0;
+      for (var x = 0; x < size; x++) {
+        if (p.foreground[row + x] == 0) continue;
+        rows[y]++;
+        cols[x]++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
     if (maxX < 0) return null;
 
     final blobWidth = maxX - minX + 1;
@@ -254,8 +246,7 @@ class AvatarDetector {
     final aspect = blobWidth / blobHeight;
     if (aspect < 0.7 || aspect > 1.43) return null;
     // A solid object fills most of its bounding box; a comb of glyph strokes
-    // leaves holes everywhere. This compactness test is what separates text
-    // from an avatar when both happen to fit the same window.
+    // leaves holes everywhere.
     final fill = covered / (blobWidth * blobHeight);
     if (fill < 0.62) return null;
 
@@ -265,10 +256,10 @@ class AvatarDetector {
     final colSpan = _mainSpan(cols, size);
     if (rowSpan < 0.68 || colSpan < 0.68) return null;
 
-    final corner = _cornerFill(rgba, w, x0, y0, size, br, bg, bb, threshold);
+    final corner = _cornerFill(p, x0, y0, size);
     // Roughly pi/4 for a disc, ~0.9 for a rounded square, ~1 for a square.
-    // The three shapes are deliberately all valid; this only prefers a window
-    // that looks like one of them over a ragged patch of content.
+    // All three are valid; this only prefers a window that looks like one of
+    // them over a ragged patch of content.
     final shapeFit = math.min(
       math.min((coverage - 0.78).abs(), (coverage - 0.88).abs()),
       (coverage - 0.98).abs(),
@@ -280,8 +271,6 @@ class AvatarDetector {
         (rowSpan + colSpan) * 12 +
         (1 - shapeFit) * 18 +
         corner * 3;
-    // Tighten the box onto the object, so the mask covers the avatar and not
-    // a lot of empty background around it.
     const pad = 1;
     return _Box(
       Rect.fromLTWH(
@@ -310,17 +299,7 @@ class AvatarDetector {
     return best / size;
   }
 
-  static double _cornerFill(
-    Uint8List rgba,
-    int w,
-    int x0,
-    int y0,
-    int size,
-    int br,
-    int bg,
-    int bb,
-    double threshold,
-  ) {
+  static double _cornerFill(_Pyramid p, int x0, int y0, int size) {
     final side = math.max(2, size ~/ 5);
     var hit = 0;
     var total = 0;
@@ -331,49 +310,208 @@ class AvatarDetector {
       (size - side, size - side),
     ]) {
       for (var y = 0; y < side; y++) {
+        final row = (y0 + cy + y) * p.width + x0 + cx;
         for (var x = 0; x < side; x++) {
-          final i = ((y0 + cy + y) * w + x0 + cx + x) * 4;
-          final distance =
-              (rgba[i] - br).abs() +
-              (rgba[i + 1] - bg).abs() +
-              (rgba[i + 2] - bb).abs();
           total++;
-          if (distance > threshold) hit++;
+          hit += p.foreground[row + x];
         }
       }
     }
     return total == 0 ? 0 : hit / total;
   }
 
+  // -------------------------------------------------------- reinforcement
+
+  /// Uses one confirmed avatar as a template for the rest of the screenshot.
+  ///
+  /// A chat UI mirrors its margins: if avatars start at x, outgoing ones start
+  /// at `width - x - size`. That is why a single outgoing avatar on the right
+  /// can be found without any repetition at all. We also take a 4×4 colour
+  /// signature from the best seed — the same person's avatar often appears
+  /// several times in one conversation, and those positions deserve a slightly
+  /// gentler shape test.
+  ///
+  /// The sweep is cheap: integral-image prefilters reject almost every window
+  /// before the full projection check runs.
+  static List<_Box> _reinforce(_Pyramid p, List<_Box> seeds) {
+    if (seeds.isEmpty) return const <_Box>[];
+    final sizes = seeds.map((b) => b.rect.width).toList()..sort();
+    final size = sizes[sizes.length ~/ 2].round();
+    if (size < 12) return const <_Box>[];
+
+    double median(List<double> values) {
+      values.sort();
+      return values[values.length ~/ 2];
+    }
+
+    final lefts = <double>[];
+    final rights = <double>[];
+    for (final seed in seeds) {
+      (seed.rect.center.dx < p.width * 0.5 ? lefts : rights)
+          .add(seed.rect.left);
+    }
+    double? left = lefts.isEmpty ? null : median(lefts);
+    double? right = rights.isEmpty ? null : median(rights);
+    // The mirrored margin is the whole point: chat avatars are symmetric.
+    if (left != null && right == null) {
+      right = p.width - left - size;
+    } else if (right != null && left == null) {
+      left = p.width - right - size;
+    }
+    final anchors = <double>[
+      for (final value in [left, right])
+        if (value != null && value >= 0 && value + size <= p.width) value,
+    ];
+    if (anchors.isEmpty) return const <_Box>[];
+    if (anchors.length == 2 && (anchors[0] - anchors[1]).abs() < size * 0.3) {
+      anchors.removeLast();
+    }
+
+    var best = seeds.first;
+    for (final seed in seeds) {
+      if (seed.score > best.score) best = seed;
+    }
+    final template = _signature(p, best.rect, size);
+    final bx = best.rect.left.round();
+    final by = best.rect.top.round();
+    final templateArea = size * size;
+    final templateLum =
+        p.sum(p.iiLum, bx, by, bx + size, by + size) / templateArea / 255.0;
+    final templateChroma =
+        p.sum(p.iiChroma, bx, by, bx + size, by + size) /
+        templateArea /
+        510.0;
+
+    final found = <_Box>[];
+    // A quarter of the avatar is plenty: the shape check tightens every box
+    // onto the object anyway, so a denser sweep only buys duplicate work.
+    final step = math.max(3, size ~/ 4);
+    final yStart = math.max(0, p.contentTop - size);
+    final yEnd = math.min(p.height, p.contentBottom + size);
+    for (final anchor in anchors) {
+      // A few pixels of horizontal slack absorbs the antialiased edge and the
+      // difference between a round and a square avatar's bounding box.
+      for (final dx in const [-3, 0, 3]) {
+        final x = (anchor + dx).round();
+        if (x < 0 || x + size > p.width) continue;
+        for (var y = yStart; y + size <= yEnd; y += step) {
+          final rect = Rect.fromLTWH(
+            x.toDouble(),
+            y.toDouble(),
+            size.toDouble(),
+            size.toDouble(),
+          );
+          final area = size * size;
+          final coverage =
+              p.sum(p.iiForeground, x, y, x + size, y + size) / area;
+          if (coverage < 0.48 || coverage > 0.995) continue;
+          final mean =
+              p.sum(p.iiDistance, x, y, x + size, y + size) / area;
+          if (mean < 45) continue;
+
+          // Strict check first. Most positions pass or fail here, so the
+          // 4×4 signature is only computed for the handful that need a second
+          // chance — that is what keeps the whole sweep in the same 10–20 ms
+          // class as the original detector.
+          final checked = _verify(p, rect, 1.0);
+          if (checked != null) {
+            _add(found, checked);
+            continue;
+          }
+          // Two cheap lookups gate the expensive signature: a different
+          // person's avatar almost never matches the seed's overall colour.
+          final lum = p.sum(p.iiLum, x, y, x + size, y + size) / area / 255.0;
+          final chroma =
+              p.sum(p.iiChroma, x, y, x + size, y + size) / area / 510.0;
+          if ((lum - templateLum).abs() +
+              (chroma - templateChroma).abs() >
+              0.18) {
+            continue;
+          }
+          if (_signatureDistance(template, _signature(p, rect, size)) < 0.12) {
+            final relaxed = _verify(p, rect, 0.85);
+            if (relaxed != null) _add(found, relaxed);
+          }
+        }
+      }
+    }
+    return found;
+  }
+
+  /// Boxes far enough into a margin to be trusted as templates.
+  static List<_Box> _marginal(_Pyramid p, List<_Box> boxes) {
+    final out = <_Box>[];
+    for (final box in boxes) {
+      final centre = (box.rect.left + box.rect.width / 2) / p.width;
+      if (centre > 0.18 && centre < 0.82) continue;
+      out.add(box);
+    }
+    return out;
+  }
+
+  /// A 4×4 grid of mean luminance and chroma, normalised to 0..1.
+  /// Sixteen integral-image lookups — cheap enough to run at every sweep
+  /// position, and discriminative enough to recognise the same avatar again.
+  static Float64List _signature(_Pyramid p, Rect rect, int size) {
+    final x0 = rect.left.round();
+    final y0 = rect.top.round();
+    final cell = math.max(2, size ~/ 4);
+    final out = Float64List(32);
+    var k = 0;
+    for (var gy = 0; gy < 4; gy++) {
+      for (var gx = 0; gx < 4; gx++) {
+        final cx0 = x0 + gx * cell;
+        final cy0 = y0 + gy * cell;
+        final cx1 = gx == 3 ? x0 + size : math.min(x0 + size, cx0 + cell);
+        final cy1 = gy == 3 ? y0 + size : math.min(y0 + size, cy0 + cell);
+        final area = math.max(1, (cx1 - cx0) * (cy1 - cy0));
+        out[k++] =
+            p.sum(p.iiLum, cx0, cy0, cx1, cy1) / area / 255.0;
+        out[k++] =
+            p.sum(p.iiChroma, cx0, cy0, cx1, cy1) / area / 510.0;
+      }
+    }
+    return out;
+  }
+
+  static double _signatureDistance(Float64List a, Float64List b) {
+    var sum = 0.0;
+    for (var i = 0; i < a.length; i++) {
+      sum += (a[i] - b[i]).abs();
+    }
+    return sum / a.length;
+  }
+
   // --------------------------------------------------------------- rhythm
 
-  static List<Rect> _regularize(_Pyramid p, List<_Box> boxes) {
+  static List<_Box> _regularizeBoxes(_Pyramid p, List<_Box> boxes) {
     final accepted = <_Box>[];
     for (final group in _cluster(boxes, vertical: true)) {
       // A bright outgoing bubble changes the local contrast enough that the
-      // same avatar can be boxed a few pixels differently down a column, so
-      // the size tolerance here is deliberately looser than for a grid row.
+      // same avatar can be boxed a few pixels differently down a column.
       if (group.length < 2 || !_sameSize(group, 0.32)) continue;
       final sorted = [...group]
         ..sort((a, b) => a.rect.top.compareTo(b.rect.top));
       _grow(p, accepted, sorted, vertical: true);
     }
     for (final group in _cluster(boxes, vertical: false)) {
-      // A horizontal row is much weaker evidence than a chat column: a line of
-      // text lines up too. Only a real grid — same size, same shape, evenly
-      // spaced — counts as a row of avatars.
+      // A horizontal row is weaker evidence than a chat column: a line of text
+      // lines up too. Only a real grid counts as a row of avatars.
       if (!_regularRow(group)) continue;
       final sorted = [...group]
         ..sort((a, b) => a.rect.left.compareTo(b.rect.left));
       _grow(p, accepted, sorted, vertical: false);
     }
-    if (accepted.isEmpty) return const <Rect>[];
+    return accepted;
+  }
 
+  /// Marginal filter, normalisation and overlap removal — shared by the
+  /// clustered boxes and the seed-driven ones so both obey the same rules.
+  static List<Rect> _finish(_Pyramid p, List<_Box> boxes) {
     final result = <Rect>[];
-    for (final box in accepted) {
+    for (final box in boxes) {
       // Chat avatars live in the left or right margin. A "regular column" in
-      // the middle band is almost always a column of text; the sweep already
-      // favours the margins, and this keeps its predictions honest too.
+      // the middle band is almost always a column of text.
       final centre = (box.rect.left + box.rect.width / 2) / p.width;
       if (centre > 0.18 && centre < 0.82) continue;
       final r = Rect.fromLTRB(
@@ -388,10 +526,7 @@ class AvatarDetector {
         if (overlap.isEmpty) continue;
         final ratio =
             (overlap.width * overlap.height) /
-            math.min(
-              other.width * other.height,
-              r.width * r.height,
-            );
+            math.min(other.width * other.height, r.width * r.height);
         if (ratio > 0.55) {
           duplicate = true;
           break;
@@ -415,7 +550,6 @@ class AvatarDetector {
 
   static bool _regularRow(List<_Box> group) {
     if (group.length < 3 || !_sameSize(group, 0.14)) return false;
-    // One shape, not a mixture: a row of avatars is all discs or all squares.
     var lowCorner = double.infinity;
     var highCorner = -double.infinity;
     for (final box in group) {
@@ -487,8 +621,6 @@ class AvatarDetector {
     }
     if (gaps.isEmpty) return;
     gaps.sort();
-    // A missed avatar makes one gap twice as long as the real pitch, so the
-    // smallest gap is the most reliable estimate.
     final pitch = gaps.first;
     final confirmed = !vertical || _hasRhythm(p, sorted.first.rect, pitch);
     if (!confirmed) return;
@@ -503,8 +635,9 @@ class AvatarDetector {
       if (found != null) _add(accepted, found);
     }
 
-    // Interpolate between two confirmed neighbours: this recovers the avatar
-    // whose own contrast was too low for the coarse sweep.
+    // Interpolate between two confirmed neighbours. Deliberately no
+    // extrapolation past the ends: predicting a message that is not there is
+    // the easiest way to invent an avatar.
     for (var i = 1; i < sorted.length; i++) {
       final start = coord(sorted[i - 1]);
       final gap = coord(sorted[i]) - start;
@@ -514,9 +647,6 @@ class AvatarDetector {
         probe(start + k * gap / steps, 0.8);
       }
     }
-    // Deliberately no extrapolation past the ends of the column. Predicting a
-    // message that is not there is the easiest way to invent an avatar; only
-    // positions bracketed by two confirmed neighbours are worth re-testing.
   }
 
   static void _add(List<_Box> list, _Box box) {
@@ -535,14 +665,9 @@ class AvatarDetector {
   }
 
   /// Cross-checks the pitch with a single-bin DFT of the column's vertical
-  /// signal.
-  ///
-  /// Goertzel gives the power at one period in O(height) — no FFT, no zero
-  /// padding, and no harmonic bookkeeping. The signal is the local luminance
-  /// spread per row inside the column, which spikes where an avatar sits. If
-  /// the guessed pitch is not actually louder than a nearby off-pitch, the
-  /// gaps were a coincidence and we keep the boxes we already have without
-  /// inventing any more.
+  /// signal. Goertzel gives the power at one period in O(height) — no FFT, no
+  /// zero padding. If the guessed pitch is not louder than a nearby off-pitch,
+  /// the gaps were a coincidence.
   static bool _hasRhythm(_Pyramid p, Rect first, double pitch) {
     final w = p.width;
     final h = p.height;
@@ -592,21 +717,29 @@ class AvatarDetector {
   }
 }
 
-/// Three summed-area tables over the downscaled preview.
+/// Adaptive pre-processing over the downscaled preview.
+///
+/// Everything the later passes need is computed in three linear scans: the
+/// dominant page colour, a foreground/distances map normalised against it, and
+/// five summed-area tables. A window query is then four integer lookups no
+/// matter how large the window is.
 class _Pyramid {
   _Pyramid(this.rgba, this.width, this.height)
     : stride = width + 1,
       lum = Uint8List(width * height),
+      foreground = Uint8List(width * height),
       iiLum = Int32List((width + 1) * (height + 1)),
       iiChroma = Int32List((width + 1) * (height + 1)),
-      iiEdge = Int32List((width + 1) * (height + 1)) {
+      iiEdge = Int32List((width + 1) * (height + 1)),
+      iiDistance = Int32List((width + 1) * (height + 1)),
+      iiForeground = Int32List((width + 1) * (height + 1)) {
     final count = width * height;
     final chroma = Uint16List(count);
-    // A chat screenshot is mostly one flat background colour. Estimating it
-    // once from a coarse colour histogram is both cheaper and far steadier
-    // than sampling a thin ring around every candidate: a ring can be polluted
-    // by the bubble or the text beside the avatar, which then makes the whole
-    // window look like "content". 4096 bins = 4 bits per channel.
+    final distance = Uint16List(count);
+
+    // Pass 1: luminance, chroma and a coarse colour histogram. 4096 bins =
+    // 4 bits per channel. A chat screenshot is mostly one flat background, so
+    // its bin is the reliable reference for the whole image.
     final bins = Int32List(4096);
     final sumR = Int32List(4096);
     final sumG = Int32List(4096);
@@ -632,14 +765,33 @@ class _Pyramid {
     backgroundG = hits == 0 ? 246 : sumG[dominant] ~/ hits;
     backgroundB = hits == 0 ? 246 : sumB[dominant] ~/ hits;
 
+    // Pass 2: adaptive normalisation. Express every pixel by its distance
+    // from the page colour and threshold it once. This is what makes a smooth
+    // gradient or a pale photo look like a solid object to the shape checks.
+    for (var i = 0, p = 0; i < count; i++, p += 4) {
+      final d =
+          (rgba[p] - backgroundR).abs() +
+          (rgba[p + 1] - backgroundG).abs() +
+          (rgba[p + 2] - backgroundB).abs();
+      distance[i] = d;
+      foreground[i] = d > AvatarDetector.foregroundThreshold ? 1 : 0;
+    }
+
+    // Pass 3: all five integral images in one sweep, plus a per-row count of
+    // foreground pixels used to locate the flat chrome strips.
+    final rowHits = Int32List(height);
     for (var y = 0; y < height; y++) {
       var rowLum = 0;
       var rowChroma = 0;
       var rowEdge = 0;
+      var rowDistance = 0;
+      var rowForeground = 0;
       for (var x = 0; x < width; x++) {
         final i = y * width + x;
         rowLum += lum[i];
         rowChroma += chroma[i];
+        rowDistance += distance[i];
+        rowForeground += foreground[i];
         final left = x > 0 ? lum[i - 1] : lum[i];
         final right = x < width - 1 ? lum[i + 1] : lum[i];
         final up = y > 0 ? lum[i - width] : lum[i];
@@ -650,8 +802,29 @@ class _Pyramid {
         iiLum[at] = iiLum[above] + rowLum;
         iiChroma[at] = iiChroma[above] + rowChroma;
         iiEdge[at] = iiEdge[above] + rowEdge;
+        iiDistance[at] = iiDistance[above] + rowDistance;
+        iiForeground[at] = iiForeground[above] + rowForeground;
       }
+      rowHits[y] = rowForeground;
     }
+
+    // The status bar, the app bar and the input box are wide flat strips with
+    // almost no foreground. Skipping them removes a whole class of false
+    // positives from the seed sweep. Deliberately conservative: never cut more
+    // than 12 % off either end.
+    final quiet = math.max(2, (width * 0.012).round());
+    final topLimit = (height * 0.12).round();
+    final bottomLimit = height - topLimit;
+    var top = 0;
+    while (top < topLimit && rowHits[top] < quiet) {
+      top++;
+    }
+    var bottom = height;
+    while (bottom > bottomLimit && rowHits[bottom - 1] < quiet) {
+      bottom--;
+    }
+    contentTop = top;
+    contentBottom = bottom;
   }
 
   final Uint8List rgba;
@@ -661,10 +834,15 @@ class _Pyramid {
   late final int backgroundR;
   late final int backgroundG;
   late final int backgroundB;
+  late final int contentTop;
+  late final int contentBottom;
   final Uint8List lum;
+  final Uint8List foreground;
   final Int32List iiLum;
   final Int32List iiChroma;
   final Int32List iiEdge;
+  final Int32List iiDistance;
+  final Int32List iiForeground;
 
   int sum(Int32List table, int x0, int y0, int x1, int y1) {
     final ax0 = x0.clamp(0, width);

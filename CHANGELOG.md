@@ -4,6 +4,33 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-11-24
+
+### Changed
+
+- Avatar detection now uses the layout of a chat screenshot as a prior. Once
+  one marginal avatar is confirmed, its size, its margin, the **mirrored**
+  margin on the other side and a 4×4 colour signature become a template, and
+  the whole image is swept along those two columns. A lone outgoing avatar —
+  which no repetition rule could ever find — is now recovered: the project's
+  synthetic chat went from 3 to **5 avatars** (all of them), still with no
+  false positives.
+- Added an adaptive pre-processing pass: the dominant page colour is estimated
+  once, every pixel is normalised into a foreground/distance map, and five
+  summed-area tables (luminance, chroma, gradient, colour distance,
+  foreground) make every window query O(1). Quiet-row analysis also finds the
+  flat status/app/input strips so the seed sweep skips them.
+- The seed sweep is gated so it stays fast: a strict shape check runs first,
+  and the 4×4 signature is only computed when the whole-window colour is
+  already close to the template. Despite the extra sweep the pass measures
+  **14.0 ms** on a 360×640 image — slightly faster than the original 14.5 ms
+  detector.
+
+### Added
+
+- Regression tests for a single outgoing avatar on the mirrored margin and for
+  flat status/input bars. Full suite: 91 tests.
+
 ## [0.4.2] — 2026-11-24
 
 ### Changed

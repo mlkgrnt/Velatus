@@ -220,6 +220,47 @@ void main() {
     }
   });
 
+  test('a lone outgoing avatar is recovered from the mirrored margin', () {
+    // Three incoming avatars repeat on the left, but the outgoing one appears
+    // exactly once on the right. No repetition rule can ever find it — only
+    // the "one good seed tells us where the other margin is" prior can.
+    final chat = _Chat();
+    for (var i = 0; i < 3; i++) {
+      final top = 60 + i * 140;
+      chat.roundedSquare(14, top, 40, i + 3);
+      chat.bubble(top);
+    }
+    chat.disc(306, 470, 40, 11);
+    chat.fill(66, 470, 296, 526, 149, 236, 105);
+    chat.textLine(76, 478, 280, 11);
+
+    final boxes = _find(chat);
+    final right = boxes.where((r) => r.center.dx > 0.8).toList();
+    expect(right, hasLength(1), reason: 'the single outgoing avatar');
+    expect(right.single.top * 640, closeTo(470, 30));
+    expect(boxes.length, greaterThanOrEqualTo(4));
+  });
+
+  test('flat status and input bars produce no candidates', () {
+    // A screenshot has a status/app bar on top and an input box at the bottom;
+    // both are wide flat strips. The adaptive content band must keep the seed
+    // sweep out of them.
+    final chat = _Chat();
+    chat.fill(0, 0, 360, 44, 250, 250, 252);
+    chat.fill(0, 586, 360, 640, 250, 250, 252);
+    for (var i = 0; i < 3; i++) {
+      final top = 90 + i * 150;
+      chat.square(14, top, 40, 60, 130, 200);
+      chat.bubble(top);
+    }
+    final boxes = _find(chat);
+    expect(boxes, isNotEmpty);
+    for (final box in boxes) {
+      expect(box.top * 640, greaterThan(44));
+      expect(box.bottom * 640, lessThan(586));
+    }
+  });
+
   test('a bare page of text produces no candidates', () {
     final chat = _Chat();
     for (var line = 0; line < 22; line++) {
@@ -248,6 +289,9 @@ void main() {
     // Measured baseline of the previous flood-fill detector on this exact
     // 360x640 image: 14.5 ms. Three times that is a generous ceiling for a
     // slow CI runner while still catching a real regression.
+    // ignore: avoid_print
+    print('avatar pass: ${perRun.toStringAsFixed(1)} ms/run '
+        '(old detector: 14.5 ms)');
     expect(perRun, lessThan(45), reason: '${perRun.toStringAsFixed(1)} ms/run');
   });
 
