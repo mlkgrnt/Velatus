@@ -4,6 +4,62 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-11-24
+
+The "it should feel like a normal app" release. Everything here came from using
+the 0.3.0 build on a real phone.
+
+### Fixed
+
+- Dragging one block of a multi-selection no longer drags the whole set. The
+  block under your finger moves; the others stay put and stay selected.
+- A corner dragged past the opposite corner now flips the box into that
+  quadrant instead of collapsing it into a line and shoving it around. The
+  anchor is captured once when the drag starts, and the press point — not the
+  position after the touch slop — is what decides which handle you grabbed.
+- Exporting and then closing the editor no longer asks "leave without
+  exporting?". Editing afterwards arms the warning again.
+- The leave-confirmation dialog uses a smaller title and secondary body text.
+- The app opens with the tool and parameters you used last: brush or box,
+  mosaic / blur / solid, size, strength, corner radius and colour.
+
+### Added
+
+- Traditional Chinese, Spanish and French. The language picker is a dialog with
+  every language written in its own words.
+- The in-app icon is now the same artwork as the launcher icon.
+
+### Changed
+
+- Settings: Privacy moved to the bottom, where a statement belongs, and the
+  language row opens a picker instead of listing five radios.
+- "Follow system" is now just "System", which fits in every language.
+- Copy is written for people rather than for a spec: 落地 is 确认, and the
+  "no account" lines are gone — there is nothing to announce.
+
+## [0.3.0] — 2026-11-24
+
+The "pick what to hide" release.
+
+### Added
+
+- A scan pass that proposes text, chat avatars and QR codes as candidate boxes.
+  Nothing is applied until you confirm, and the boxes stay editable afterwards.
+- Multi-selection: tap to add, tap again to remove, and restyle the whole set at
+  once.
+- In-app update check with a download and an Android install prompt, plus
+  mirrors for networks where GitHub is slow.
+
+### Changed
+
+- Rectangle and rounded rectangle merged into one box tool with a radius slider;
+  they were the same geometry with a different corner.
+- Re-running a scan replaces the previous detection instead of stacking another
+  layer on top of it.
+- The tool dock is a fixed two-row height in every state.
+- Blur reaches a genuinely strong setting, and the canvas can zoom further out.
+- Per-ABI APKs: the download went from 86 MB to 33 MB with no feature removed.
+
 ## [0.2.0] — 2026-11-24
 
 The "one block, one object" release. Feedback from the first build reshaped how
