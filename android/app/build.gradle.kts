@@ -61,6 +61,8 @@ dependencies {
     // actually uses. Without this the Chinese recogniser is absent at runtime
     // (NoClassDefFoundError) and R8 fails on the dangling reference.
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    // FileProvider, used to hand a downloaded APK to the system installer.
+    implementation("androidx.core:core-ktx:1.13.1")
 }
 
 kotlin {

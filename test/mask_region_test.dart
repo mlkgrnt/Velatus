@@ -10,10 +10,11 @@ void main() {
     required MaskShape shape,
     required List<Offset> points,
     double size = 0.05,
-    double radius = 0.24,
+    double radius = 0.0,
+    String id = 'test',
   }) {
     return MaskRegion(
-      id: 'test',
+      id: id,
       style: MaskStyle.mosaic,
       shape: shape,
       points: points,
@@ -23,9 +24,9 @@ void main() {
   }
 
   group('MaskRegion geometry', () {
-    test('rectangle maps normalized points into the image rect', () {
+    test('a box maps normalized points into the image rect', () {
       final mask = region(
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: const [Offset(0.25, 0.2), Offset(0.75, 0.8)],
       );
       final path = mask.toPath(rect);
@@ -43,9 +44,9 @@ void main() {
       expect(bounds.top, closeTo(50, 0.001));
     });
 
-    test('a rounded rectangle loses its sharp corners', () {
+    test('a radius rounds the corners of the same box', () {
       final mask = region(
-        shape: MaskShape.roundedRect,
+        shape: MaskShape.box,
         points: const [Offset(0.2, 0.2), Offset(0.8, 0.8)],
         radius: 0.5,
       );
@@ -53,15 +54,27 @@ void main() {
       // 600 x 300 in the image rect, so the corner radius is 150.
       expect(path.contains(const Offset(500, 200)), isTrue);
       expect(path.contains(const Offset(215, 115)), isFalse);
+      // The bounding box is unchanged: turning up the radius must never move
+      // the mask, only soften it.
+      expect(path.getBounds(), const Rect.fromLTWH(200, 100, 600, 300));
     });
 
-    test('the corner radius collapses back to a square', () {
-      final rounded = region(
-        shape: MaskShape.roundedRect,
+    test('radius 0 is a plain rectangle', () {
+      final mask = region(
+        shape: MaskShape.box,
         points: const [Offset(0.2, 0.2), Offset(0.8, 0.8)],
-        radius: 0,
       );
-      expect(rounded.toPath(rect).contains(const Offset(205, 105)), isTrue);
+      expect(mask.radius, 0);
+      expect(mask.toPath(rect).contains(const Offset(205, 105)), isTrue);
+    });
+
+    test('radius is capped so it cannot invert the box', () {
+      final mask = region(
+        shape: MaskShape.box,
+        points: const [Offset(0.2, 0.2), Offset(0.8, 0.8)],
+        radius: 4.0,
+      );
+      expect(mask.toPath(rect).getBounds(), const Rect.fromLTWH(200, 100, 600, 300));
     });
   });
 
@@ -76,19 +89,20 @@ void main() {
       expect(mask.hitTest(const Offset(0.5, 0.8), 0), isFalse);
     });
 
-    test('rect hit test includes the interior', () {
+    test('box hit test includes the interior', () {
       final mask = region(
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: const [Offset(0.2, 0.2), Offset(0.6, 0.6)],
       );
       expect(mask.hitTest(const Offset(0.4, 0.4), 0), isTrue);
       expect(mask.hitTest(const Offset(0.9, 0.9), 0), isFalse);
     });
 
-    test('rounded rect hit test follows the box', () {
+    test('a rounded box is still hit by its bounding box', () {
       final mask = region(
-        shape: MaskShape.roundedRect,
+        shape: MaskShape.box,
         points: const [Offset(0.2, 0.2), Offset(0.8, 0.8)],
+        radius: 0.5,
       );
       expect(mask.hitTest(const Offset(0.5, 0.5), 0), isTrue);
       expect(mask.hitTest(const Offset(0.95, 0.95), 0), isFalse);
@@ -113,7 +127,7 @@ void main() {
   group('editing an existing mask', () {
     test('translated keeps the shape and moves every point', () {
       final mask = region(
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: const [Offset(0.1, 0.1), Offset(0.3, 0.3)],
       );
       final moved = mask.translated(const Offset(0.2, -0.05));
@@ -123,11 +137,12 @@ void main() {
       );
       expect(moved.id, mask.id);
       expect(moved.shape, mask.shape);
+      expect(moved.radius, mask.radius);
     });
 
     test('scaledTo stretches the box and everything inside it', () {
       final mask = region(
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: const [Offset(0.2, 0.2), Offset(0.6, 0.4)],
       );
       final resized = mask.scaledTo(const Rect.fromLTRB(0, 0, 1, 1));
@@ -159,7 +174,7 @@ void main() {
 
   test('copyWith keeps identity and updates requested fields', () {
     final mask = region(
-      shape: MaskShape.rect,
+      shape: MaskShape.box,
       points: const [Offset(0.1, 0.1), Offset(0.2, 0.2)],
     );
     final updated = mask.copyWith(strength: 0.9, visible: false);
@@ -167,5 +182,27 @@ void main() {
     expect(updated.strength, 0.9);
     expect(updated.visible, isFalse);
     expect(updated.style, mask.style);
+  });
+
+  group('detected regions', () {
+    test('every detector prefix is recognised as replaceable', () {
+      for (final kind in ['text', 'avatar', 'qr']) {
+        final detected = region(
+          id: '${MaskRegion.detectedIdPrefix}${kind}_1_0',
+          shape: MaskShape.box,
+          points: const [Offset(0.1, 0.1), Offset(0.2, 0.2)],
+        );
+        expect(detected.isDetected, isTrue, reason: kind);
+        expect(detected.isFill, isTrue);
+      }
+    });
+
+    test('hand-drawn masks are not replaced by a later scan', () {
+      final drawn = region(
+        shape: MaskShape.stroke,
+        points: const [Offset(0.1, 0.1)],
+      );
+      expect(drawn.isDetected, isFalse);
+    });
   });
 }

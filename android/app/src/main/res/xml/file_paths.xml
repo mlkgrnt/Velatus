@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The updater writes the APK into the app cache, so that is the only place
+     the installer is allowed to read from. Nothing else is shared. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

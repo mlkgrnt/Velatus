@@ -11,13 +11,23 @@ import 'dart:ui' as ui;
 /// stroke stays round, a rectangle stays a rectangle, and changing the strength
 /// can never change the masked area.
 ///
-/// Textures are keyed by the property that actually changes the pixels:
-/// the integer block size for mosaic, and the rounded sigma for blur.
+/// Textures are keyed by the property that actually changes the pixels: the
+/// integer block size for mosaic, and the rounded sigma for blur.
 class MaskTextureCache {
   /// Blur textures are capped at this side length. A blurred image has no
   /// detail above roughly `1 / sigma`, so capping costs nothing visually while
   /// keeping a 48 MP export from allocating another 190 MB buffer.
-  static const int maxBlurSide = 2048;
+  static const int maxBlurSide = 1536;
+
+  /// Dragging the strength slider generates a texture per integer sigma, which
+  /// is dozens per gesture. Each one is a full-size bitmap, so the cache has to
+  /// have a ceiling; the nearest-neighbour lookup below means a miss during a
+  /// drag still draws a plausible image instead of the unblurred source.
+  static const int _maxBlurEntries = 6;
+
+  /// Mosaic textures are small (one texel per block), so they can keep more
+  /// history for cheap.
+  static const int _maxMosaicEntries = 16;
 
   final Map<int, ui.Image> _mosaic = <int, ui.Image>{};
   final Map<int, ui.Image> _blur = <int, ui.Image>{};
@@ -28,9 +38,40 @@ class MaskTextureCache {
 
   ui.Image? blur(int sigmaPx) => _blur[sigmaPx];
 
+  /// Closest cached mosaic texture, or null when none exist yet.
+  ///
+  /// Dragging the strength slider walks through dozens of block sizes a second;
+  /// building each one is impossible, and falling back to the source made the
+  /// image snap back to "no mask" mid-drag. Reusing the nearest finished
+  /// texture keeps the drag continuous and only costs a pixel of coarseness.
+  ui.Image? mosaicNearest(int blockPx) => _nearest(_mosaic, blockPx);
+
+  /// Closest cached blur texture, or null when none exist yet.
+  ui.Image? blurNearest(int sigmaPx) => _nearest(_blur, sigmaPx);
+
+  static ui.Image? _nearest(Map<int, ui.Image> cache, int key) {
+    if (cache.isEmpty) return null;
+    final exact = cache[key];
+    if (exact != null) return exact;
+    int? bestKey;
+    var bestDistance = 1 << 30;
+    for (final candidate in cache.keys) {
+      final distance = (candidate - key).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestKey = candidate;
+      }
+    }
+    return bestKey == null ? null : cache[bestKey];
+  }
+
   ui.Image? get source => _source;
 
   bool get isEmpty => _mosaic.isEmpty && _blur.isEmpty;
+
+  bool get hasBlur => _blur.isNotEmpty;
+
+  bool get hasMosaic => _mosaic.isNotEmpty;
 
   void attach(ui.Image source) {
     if (identical(_source, source)) return;
@@ -43,9 +84,11 @@ class MaskTextureCache {
     final source = _source;
     if (source == null) return null;
     final cached = _mosaic[blockPx];
-    if (cached != null) return cached;
-    const key = 'mosaic';
-    final tag = '$key$blockPx';
+    if (cached != null) {
+      _touch(_mosaic, blockPx, cached);
+      return cached;
+    }
+    final tag = 'mosaic$blockPx';
     if (!_building.add(tag)) return null;
     try {
       final width = math.max(1, (source.width / blockPx).round());
@@ -68,6 +111,7 @@ class MaskTextureCache {
         },
       );
       _mosaic[blockPx] = image;
+      _trim(_mosaic, _maxMosaicEntries);
       return image;
     } finally {
       _building.remove(tag);
@@ -84,7 +128,10 @@ class MaskTextureCache {
     final source = _source;
     if (source == null) return null;
     final cached = _blur[sigmaPx];
-    if (cached != null) return cached;
+    if (cached != null) {
+      _touch(_blur, sigmaPx, cached);
+      return cached;
+    }
     final tag = 'blur$sigmaPx';
     if (!_building.add(tag)) return null;
     try {
@@ -117,10 +164,30 @@ class MaskTextureCache {
         },
       );
       _blur[sigmaPx] = image;
+      _trim(_blur, _maxBlurEntries);
       return image;
     } finally {
       _building.remove(tag);
     }
+  }
+
+  /// Drops the oldest entries above [limit].
+  ///
+  /// Dropped images are deliberately *not* disposed: the last frame painted
+  /// may still be holding one in its shader, and disposing an image that a
+  /// recorded picture references throws on the raster thread. Letting the
+  /// finaliser collect them is slower but cannot crash a render pass.
+  static void _trim(Map<int, ui.Image> cache, int limit) {
+    while (cache.length > limit) {
+      cache.remove(cache.keys.first);
+    }
+  }
+
+  /// Moves [key] to the end so the trim above evicts the stalest texture.
+  static void _touch(Map<int, ui.Image> cache, int key, ui.Image image) {
+    cache
+      ..remove(key)
+      ..[key] = image;
   }
 
   Future<ui.Image> _record(

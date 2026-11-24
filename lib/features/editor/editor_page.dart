@@ -4,9 +4,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/settings_controller.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/detector_service.dart';
 import '../../services/export_saver.dart';
 import '../../services/image_loader.dart';
-import '../../services/ocr_service.dart';
 import 'editor_controller.dart';
 import 'widgets/editor_canvas.dart';
 import 'widgets/export_sheet.dart';
@@ -33,7 +33,7 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   late final EditorController _controller;
   late final bool _ownsController;
-  bool _ocrRunning = false;
+  bool _scanRunning = false;
   bool _allowPop = false;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
@@ -58,31 +58,44 @@ class _EditorPageState extends State<EditorPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _runOcr() async {
-    if (_ocrRunning) return;
-    if (!OcrService.isSupported) {
-      _showMessage(l10n.ocrUnavailable);
-      return;
-    }
-    setState(() => _ocrRunning = true);
+  Future<void> _runScan() async {
+    if (_scanRunning) return;
+    setState(() => _scanRunning = true);
     try {
-      final regions = await OcrService.detect(
+      final outcome = await DetectorService.detect(
         widget.image,
         style: _controller.style,
         strength: _controller.strength,
+        radius: _controller.radius,
+        color: _controller.solidColor,
       );
       if (!mounted) return;
-      if (regions.isEmpty) {
-        _showMessage(l10n.ocrNone);
+      if (outcome.isEmpty) {
+        _showMessage(l10n.scanNone);
       } else {
-        _controller.addRegions(regions);
-        _showMessage(l10n.ocrFound(regions.length));
+        _controller.setPending(outcome.candidates);
+        _showMessage(_describe(outcome));
       }
     } catch (error) {
-      _showMessage(l10n.ocrFailed);
+      if (mounted) _showMessage('${l10n.scanFailed}: $error');
     } finally {
-      if (mounted) setState(() => _ocrRunning = false);
+      if (mounted) setState(() => _scanRunning = false);
     }
+  }
+
+  /// "12 text · 3 avatars" — only the kinds that were actually found.
+  String _describe(DetectOutcome outcome) {
+    final parts = <String>[];
+    for (final kind in DetectKind.values) {
+      final count = outcome.of(kind);
+      if (count == 0) continue;
+      parts.add(switch (kind) {
+        DetectKind.text => l10n.scanFoundText(count),
+        DetectKind.avatar => l10n.scanFoundAvatar(count),
+        DetectKind.qr => l10n.scanFoundQr(count),
+      });
+    }
+    return parts.join(' · ');
   }
 
   Future<void> _clearAll() async {
@@ -330,7 +343,14 @@ class _EditorPageState extends State<EditorPage> {
                               ),
                             ),
                           ),
-                          if (_controller.draft == null &&
+                          if (_controller.hasPending)
+                            Positioned(
+                              left: 12,
+                              right: 12,
+                              bottom: 12,
+                              child: _PendingBar(controller: _controller),
+                            )
+                          else if (_controller.draft == null &&
                               !_controller.busy &&
                               (_controller.hasSelection ||
                                   !_controller.hasMasks))
@@ -342,7 +362,8 @@ class _EditorPageState extends State<EditorPage> {
                                 child: Center(
                                   child: _ToolHint(
                                     tool: _controller.tool,
-                                    selected: _controller.hasSelection,
+                                    selectionCount:
+                                        _controller.selectionCount,
                                   ),
                                 ),
                               ),
@@ -352,8 +373,8 @@ class _EditorPageState extends State<EditorPage> {
                     ),
                     ToolDock(
                       controller: _controller,
-                      onOcr: OcrService.isSupported ? _runOcr : null,
-                      ocrBusy: _ocrRunning,
+                      onScan: _runScan,
+                      scanBusy: _scanRunning,
                     ),
                   ],
                 ),
@@ -396,27 +417,28 @@ class _CompareButton extends StatelessWidget {
 }
 
 class _ToolHint extends StatelessWidget {
-  const _ToolHint({required this.tool, required this.selected});
+  const _ToolHint({required this.tool, required this.selectionCount});
 
   final EditorTool tool;
-  final bool selected;
+  final int selectionCount;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final text = selected
-        ? l10n.selectionHint
-        : switch (tool) {
-            EditorTool.brush => l10n.brushHint,
-            EditorTool.rect => l10n.rectHint,
-            EditorTool.roundedRect => l10n.roundedRectHint,
-            EditorTool.select => l10n.selectHint,
-          };
+    final text = switch (selectionCount) {
+      0 => switch (tool) {
+        EditorTool.brush => l10n.brushHint,
+        EditorTool.box => l10n.boxHint,
+        EditorTool.select => l10n.selectHint,
+      },
+      1 => l10n.selectionHint,
+      _ => l10n.selectionHintMulti(selectionCount),
+    };
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: Container(
-        key: ValueKey('$tool-$selected'),
+        key: ValueKey('$tool-$selectionCount'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: theme.colorScheme.inverseSurface.withValues(alpha: 0.86),
@@ -427,6 +449,91 @@ class _ToolHint extends StatelessWidget {
           style: theme.textTheme.labelMedium?.copyWith(
             color: theme.colorScheme.onInverseSurface,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The confirmation step for a scan.
+///
+/// Nothing a detector returns is applied automatically. The boxes stay as
+/// outlines you can tap on and off, which is the only honest way to ship a
+/// heuristic: you get to look at what it thought before it touches the picture.
+class _PendingBar extends StatelessWidget {
+  const _PendingBar({required this.controller});
+
+  final EditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final total = controller.pending.length;
+    final chosen = controller.pendingSelectedCount;
+    final all = chosen == total;
+
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.pendingHint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.pendingCount(chosen, total),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => controller.setAllPending(!all),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(all ? l10n.pendingClear : l10n.pendingAll),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: controller.cancelPending,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(l10n.cancel),
+                ),
+                const SizedBox(width: 4),
+                FilledButton(
+                  onPressed: chosen == 0 ? null : controller.commitPending,
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(l10n.apply),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

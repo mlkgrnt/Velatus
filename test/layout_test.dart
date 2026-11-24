@@ -8,6 +8,7 @@ import 'package:velatus/core/settings_controller.dart';
 import 'package:velatus/domain/mask_region.dart';
 import 'package:velatus/features/editor/editor_controller.dart';
 import 'package:velatus/features/editor/editor_page.dart';
+import 'package:velatus/features/editor/widgets/tool_dock.dart';
 import 'package:velatus/l10n/app_localizations.dart';
 import 'package:velatus/services/image_loader.dart';
 
@@ -79,18 +80,41 @@ void main() {
     await pumpEditor(tester);
     expect(tester.takeException(), isNull);
     expect(find.text('涂抹'), findsOneWidget);
-    expect(find.text('圆角框'), findsOneWidget);
+    expect(find.text('框'), findsOneWidget);
+    expect(find.text('选择'), findsOneWidget);
   });
 
-  testWidgets('solid colour row fits a small phone', (tester) async {
-    await pumpEditor(
-      tester,
-      prepare: (controller) => controller.setStyle(MaskStyle.solid),
-    );
+  testWidgets('the dock is the same height in every tool state', (
+    tester,
+  ) async {
+    // The complaint this guards: the bar used to stack a variable number of
+    // sliders, so switching tools resized the canvas underneath the photo.
+    final heights = <String, double>{};
+    Future<void> measure(String name) async {
+      heights[name] = tester.getSize(find.byType(ToolDock)).height;
+    }
+
+    await pumpEditor(tester);
+    await measure('brush');
+
+    await tester.tap(find.text('框'));
+    await tester.pumpAndSettle();
+    await measure('box');
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('选择'));
+    await tester.pumpAndSettle();
+    await measure('select');
+
+    await tester.tap(find.byTooltip('色块'));
+    await tester.pumpAndSettle();
+    await measure('solid');
+    expect(tester.takeException(), isNull);
+
+    expect(heights.values.toSet(), hasLength(1), reason: '$heights');
   });
 
-  testWidgets('a selected mask offers delete and keeps the tool bar intact', (
+  testWidgets('a selected mask offers the delete action and a hint', (
     tester,
   ) async {
     final controller = await pumpEditor(
@@ -100,7 +124,7 @@ void main() {
           const MaskRegion(
             id: 'm1',
             style: MaskStyle.mosaic,
-            shape: MaskShape.rect,
+            shape: MaskShape.box,
             points: [Offset(0.2, 0.2), Offset(0.8, 0.4)],
           ),
         ]);
@@ -110,15 +134,68 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(controller.hasSelection, isTrue);
     expect(find.text('拖动移动 · 四角缩放'), findsOneWidget);
+    // Always present, enabled only with a selection: a button that appears and
+    // disappears would move the others around.
+    expect(find.byTooltip('删除这处打码'), findsOneWidget);
   });
 
-  testWidgets('the rounded rect tool exposes a corner radius slider', (
+  testWidgets('a multi-selection reports its size and keeps the dock height', (
     tester,
   ) async {
-    await pumpEditor(
+    final controller = await pumpEditor(
       tester,
-      prepare: (controller) => controller.setTool(EditorTool.roundedRect),
+      prepare: (controller) {
+        controller.addRegions([
+          const MaskRegion(
+            id: 'm1',
+            style: MaskStyle.mosaic,
+            shape: MaskShape.box,
+            points: [Offset(0.1, 0.1), Offset(0.4, 0.3)],
+          ),
+          const MaskRegion(
+            id: 'm2',
+            style: MaskStyle.mosaic,
+            shape: MaskShape.box,
+            points: [Offset(0.5, 0.5), Offset(0.9, 0.7)],
+          ),
+        ]);
+        controller.selectAt(const Offset(0.2, 0.2));
+        controller.selectAt(const Offset(0.7, 0.6));
+      },
     );
     expect(tester.takeException(), isNull);
+    expect(controller.selectionCount, 2);
+    expect(find.text('已选 2 处 · 四角只缩放你碰到的那个'), findsOneWidget);
+  });
+
+  testWidgets('the scan confirmation bar fits a small phone', (tester) async {
+    final controller = await pumpEditor(tester);
+    controller.setPending([
+      const MaskRegion(
+        id: 'det_text_1_0',
+        style: MaskStyle.mosaic,
+        shape: MaskShape.box,
+        points: [Offset(0.1, 0.1), Offset(0.5, 0.2)],
+      ),
+      const MaskRegion(
+        id: 'det_avatar_1_1',
+        style: MaskStyle.mosaic,
+        shape: MaskShape.box,
+        points: [Offset(0.06, 0.4), Offset(0.2, 0.55)],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('点选要盖住的框'), findsOneWidget);
+    expect(find.text('2/2'), findsOneWidget);
+
+    await tester.tap(find.text('全不选'));
+    await tester.pumpAndSettle();
+    expect(controller.pendingSelectedCount, 0);
+    expect(find.text('0/2'), findsOneWidget);
+
+    await tester.tap(find.text('全选'));
+    await tester.pumpAndSettle();
+    expect(controller.pendingSelectedCount, 2);
   });
 }

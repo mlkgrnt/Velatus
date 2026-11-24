@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme.dart';
+import '../../../domain/mask_region.dart';
 import '../../../services/mask_renderer.dart';
 import '../editor_controller.dart';
 
@@ -43,6 +44,9 @@ class _EditorCanvasState extends State<EditorCanvas> {
   Offset _panOrigin = Offset.zero;
 
   EditorController get c => widget.controller;
+
+  static const double _minScale = 0.3;
+  static const double _maxScale = 12;
 
   // ------------------------------------------------------------------ mapping
 
@@ -90,12 +94,9 @@ class _EditorCanvasState extends State<EditorCanvas> {
     );
   }
 
-  /// Screen-space frame around the selected region, or null.
-  Rect? _selectionFrame(Rect imageRect) {
-    final region = c.selectedRegion;
-    if (region == null || region.points.isEmpty) return null;
+  /// Screen-space frame around [region].
+  Rect _frameFor(MaskRegion region, Rect imageRect) {
     final bounds = region.toPath(imageRect).getBounds();
-    if (bounds.isEmpty && !region.isStroke) return null;
     final pad = region.isStroke
         ? region.size * imageRect.shortestSide / 2
         : 0.0;
@@ -141,7 +142,7 @@ class _EditorCanvasState extends State<EditorCanvas> {
     final relative = _gestureBaseScale == 0
         ? 1.0
         : details.scale / _gestureBaseScale;
-    final newScale = (_startScale * relative).clamp(1.0, 12.0);
+    final newScale = (_startScale * relative).clamp(_minScale, _maxScale);
     final width = base.width * newScale;
     final height = base.height * newScale;
     final center = details.localFocalPoint -
@@ -156,7 +157,7 @@ class _EditorCanvasState extends State<EditorCanvas> {
   void _zoomAt(double factor, Offset focal, Size canvas) {
     final rect = _displayRect(canvas);
     final norm = _rawNormalize(focal, rect);
-    final newScale = (_scale * factor).clamp(1.0, 12.0);
+    final newScale = (_scale * factor).clamp(_minScale, _maxScale);
     if (newScale == _scale) return;
     final base = _fitRect(canvas);
     final width = base.width * newScale;
@@ -169,14 +170,34 @@ class _EditorCanvasState extends State<EditorCanvas> {
     });
   }
 
-  void _resetView() {
-    setState(() {
-      _scale = 1;
-      _offset = Offset.zero;
-    });
-  }
-
   // ------------------------------------------------------------------ gestures
+
+  /// A tap is the primary way of selecting a block, so it is handled here and
+  /// not in `onScaleStart` — the scale recogniser only wins after the pointer
+  /// has moved past the touch slop, which is why tapping used to do nothing.
+  void _handleTap(Offset local, Size canvas) {
+    if (c.busy) return;
+    final rect = _displayRect(canvas);
+    final norm = _rawNormalize(local, rect);
+
+    if (c.hasPending) {
+      for (var i = c.pending.length - 1; i >= 0; i--) {
+        final candidate = c.pending[i];
+        if (candidate.hitTest(norm, 0.01)) {
+          c.togglePending(candidate.id);
+          return;
+        }
+      }
+      return;
+    }
+    if (c.tool == EditorTool.select) {
+      c.selectAt(norm);
+      return;
+    }
+    // With a drawing tool a tap on an existing block means "pick this one".
+    if (!rect.inflate(24).contains(local)) return;
+    c.selectAt(norm);
+  }
 
   void _handleScaleStart(ScaleStartDetails details, Size canvas) {
     final rect = _displayRect(canvas);
@@ -187,34 +208,36 @@ class _EditorCanvasState extends State<EditorCanvas> {
       _startZoom(local, 1.0, rect);
       return;
     }
-    if (c.busy) return;
+    if (c.busy || c.hasPending) return;
 
     _downPoint = local;
     _lastNorm = _rawNormalize(local, rect);
     _moved = false;
 
-    if (c.tool == EditorTool.select) {
-      // Only the select tool moves things, so a brush stroke can still be
-      // painted straight across an existing mask.
-      final frame = _selectionFrame(rect);
-      if (frame != null) {
+    if (c.hasSelection) {
+      // Corner handles first: they sit on top of the masks.
+      for (final region in c.selectedRegions.reversed) {
+        final frame = _frameFor(region, rect);
         final corner = _cornerAt(frame, local);
         if (corner >= 0) {
+          c.focusSelection(region.id);
           _gesture = _Gesture.resize;
           _corner = corner;
           c.beginScrub();
           return;
         }
-        if (c.selectedRegion!.hitTest(_lastNorm, 0.012)) {
+      }
+      // Dragging any selected block moves the whole selection.
+      for (final region in c.selectedRegions) {
+        if (region.hitTest(_lastNorm, 0.012)) {
           _gesture = _Gesture.move;
           c.beginScrub();
           return;
         }
       }
-      c.selectAt(_lastNorm);
-      return;
     }
 
+    if (c.tool == EditorTool.select) return;
     if (!rect.inflate(24).contains(local)) {
       c.clearSelection();
       return;
@@ -243,18 +266,21 @@ class _EditorCanvasState extends State<EditorCanvas> {
         c.translateSelected(norm - _lastNorm);
         _lastNorm = norm;
       case _Gesture.resize:
-        final region = c.selectedRegion;
-        final frame = _selectionFrame(rect);
-        if (region == null || frame == null) return;
+        final region = c.primaryRegion;
+        if (region == null) return;
+        final frame = _frameFor(region, rect);
         final pad = region.isStroke
             ? region.size * rect.shortestSide / 2
             : 0.0;
-        final anchorNorm = _rawNormalize(_cornerPoint(frame, switch (_corner) {
-          0 => 3,
-          1 => 2,
-          2 => 1,
-          _ => 0,
-        }), rect);
+        final anchorNorm = _rawNormalize(
+          _cornerPoint(frame, switch (_corner) {
+            0 => 3,
+            1 => 2,
+            2 => 1,
+            _ => 0,
+          }),
+          rect,
+        );
         final box = Rect.fromPoints(
           anchorNorm,
           _rawNormalize(local, rect),
@@ -280,12 +306,10 @@ class _EditorCanvasState extends State<EditorCanvas> {
 
   void _handleScaleEnd() {
     if (_gesture == _Gesture.draw) {
-      if (!_moved) {
-        // A tap with a drawing tool means "pick this block", not "draw a dot".
-        c.cancelDraft();
-        c.selectAt(_lastNorm);
-      } else {
+      if (_moved) {
         c.endAt();
+      } else {
+        c.cancelDraft();
       }
     }
     if (_gesture == _Gesture.move || _gesture == _Gesture.resize) {
@@ -346,16 +370,10 @@ class _EditorCanvasState extends State<EditorCanvas> {
             onPointerCancel: (_) => _panStart = null,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
+              onTapUp: (details) => _handleTap(details.localPosition, size),
               onScaleStart: (details) => _handleScaleStart(details, size),
               onScaleUpdate: (details) => _handleScaleUpdate(details, size),
               onScaleEnd: (_) => _handleScaleEnd(),
-              onDoubleTap: () {
-                if (_scale > 1.01) {
-                  _resetView();
-                } else {
-                  _zoomAt(2.0, size.center(Offset.zero), size);
-                }
-              },
               child: Container(
                 color: isDark
                     ? CanvasColors.darkBackdrop
@@ -460,13 +478,24 @@ class _EditorPainter extends CustomPainter {
       );
     }
 
-    final selected = controller.selectedRegion;
-    if (selected != null && selected.visible) {
+    for (final candidate in controller.pending) {
+      MaskRenderer.paintCandidate(
+        canvas,
+        imageRect,
+        candidate,
+        accent: accent,
+        selected: controller.isPendingSelected(candidate.id),
+        muted: isDark ? const Color(0xFF9AA3B2) : const Color(0xFF6B7280),
+      );
+    }
+
+    for (final region in controller.selectedRegions) {
       MaskRenderer.paintSelection(
         canvas,
         imageRect,
-        selected,
+        region,
         accent: accent,
+        handles: controller.pending.isEmpty,
       );
     }
   }

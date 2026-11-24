@@ -10,7 +10,7 @@ import '../../services/image_loader.dart';
 import '../../services/mask_renderer.dart';
 import '../../services/mask_texture_cache.dart';
 
-enum EditorTool { brush, rect, roundedRect, select }
+enum EditorTool { brush, box, select }
 
 class EditorController extends ChangeNotifier {
   EditorController({required this.image}) {
@@ -25,16 +25,22 @@ class EditorController extends ChangeNotifier {
   final List<List<MaskRegion>> _undoStack = <List<MaskRegion>>[];
   final List<List<MaskRegion>> _redoStack = <List<MaskRegion>>[];
   MaskRegion? _draft;
-  String? _selectedId;
+  final Set<String> _selectedIds = <String>{};
+  String? _primaryId;
   List<MaskRegion>? _scrubSnapshot;
   Timer? _textureTimer;
   bool _disposed = false;
+
+  /// Candidates produced by detection, waiting for the user to pick which ones
+  /// are actually worth hiding. They are not part of the document yet.
+  List<MaskRegion> _pending = <MaskRegion>[];
+  final Set<String> _pendingIds = <String>{};
 
   EditorTool _tool = EditorTool.brush;
   MaskStyle _style = MaskStyle.mosaic;
   double _brushSize = 0.055;
   double _strength = 0.65;
-  double _radius = 0.24;
+  double _radius = 0.0;
   Color _solidColor = const Color(0xFF14161C);
   bool _showOriginal = false;
   bool _busy = false;
@@ -42,7 +48,6 @@ class EditorController extends ChangeNotifier {
 
   List<MaskRegion> get regions => List.unmodifiable(_regions);
   MaskRegion? get draft => _draft;
-  String? get selectedId => _selectedId;
   EditorTool get tool => _tool;
   MaskStyle get style => _style;
   double get brushSize => _brushSize;
@@ -55,12 +60,25 @@ class EditorController extends ChangeNotifier {
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
   bool get hasMasks => _regions.isNotEmpty;
-  bool get hasSelection => _selectedId != null;
 
   int get maskCount => _regions.length;
 
-  MaskRegion? get selectedRegion {
-    final id = _selectedId;
+  // ---------------------------------------------------------------- selection
+
+  Set<String> get selectedIds => Set<String>.unmodifiable(_selectedIds);
+  bool get hasSelection => _selectedIds.isNotEmpty;
+  int get selectionCount => _selectedIds.length;
+
+  List<MaskRegion> get selectedRegions => [
+    for (final region in _regions)
+      if (_selectedIds.contains(region.id)) region,
+  ];
+
+  /// The region whose handles are shown and whose box a corner drag changes.
+  String? get primaryId => _primaryId;
+
+  MaskRegion? get primaryRegion {
+    final id = _primaryId;
     if (id == null) return null;
     for (final region in _regions) {
       if (region.id == id) return region;
@@ -68,13 +86,39 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
+  /// Single-selection alias, kept for call sites that only need one.
+  MaskRegion? get selectedRegion => primaryRegion;
+
+  bool isSelected(String id) => _selectedIds.contains(id);
+
   /// Textures resolved against the preview-sized source.
-  MaskTextures get textures =>
-      MaskTextures(mosaic: _textureCache.mosaic, blur: _textureCache.blur);
+  MaskTextures get textures => MaskTextures(
+    mosaic: _textureCache.mosaicNearest,
+    blur: _textureCache.blurNearest,
+  );
 
   // ---------------------------------------------------------------- parameters
 
+  /// Applies to every selected region, so a multi-selection can be restyled in
+  /// one go — "the new value wins" for the whole set.
+  void _applyToSelection(MaskRegion Function(MaskRegion region) change) {
+    if (_selectedIds.isEmpty) return;
+    var touched = false;
+    for (var i = 0; i < _regions.length; i++) {
+      if (!_selectedIds.contains(_regions[i].id)) continue;
+      final next = change(_regions[i]);
+      if (!identical(next, _regions[i])) {
+        _regions[i] = next;
+        touched = true;
+      }
+    }
+    if (touched) notifyListeners();
+  }
+
   void setTool(EditorTool value) {
+    // Switching tools means "I am done with this scan". Leaving the candidate
+    // boxes up while the brush refuses to draw would feel broken.
+    if (_pending.isNotEmpty) cancelPending();
     if (_tool == value) {
       if (value != EditorTool.select) clearSelection();
       return;
@@ -82,67 +126,108 @@ class EditorController extends ChangeNotifier {
     _tool = value;
     _draft = null;
     // Picking a drawing tool means you are done with the current block.
-    if (value != EditorTool.select) _selectedId = null;
+    if (value != EditorTool.select) clearSelection();
     notifyListeners();
   }
 
   void setStyle(MaskStyle value) {
     _style = value;
-    final selected = selectedRegion;
-    if (selected != null) {
-      _replace(
-        selected.copyWith(
-          style: value,
-          strength: value == MaskStyle.solid ? selected.strength : _strength,
-          color: value == MaskStyle.solid ? _solidColor : selected.color,
-        ),
-        recordHistory: true,
-      );
-      _warmTextures();
+    _applyToPending(
+      (region) => region.copyWith(
+        style: value,
+        strength: value == MaskStyle.solid ? region.strength : _strength,
+        color: value == MaskStyle.solid ? _solidColor : region.color,
+      ),
+    );
+    if (_selectedIds.isEmpty) {
+      notifyListeners();
+      return;
     }
+    _pushHistory();
+    for (var i = 0; i < _regions.length; i++) {
+      final region = _regions[i];
+      if (!_selectedIds.contains(region.id)) continue;
+      _regions[i] = region.copyWith(
+        style: value,
+        strength: value == MaskStyle.solid ? region.strength : _strength,
+        color: value == MaskStyle.solid ? _solidColor : region.color,
+      );
+    }
+    _warmTextures();
     notifyListeners();
   }
 
   void setBrushSize(double value) {
     _brushSize = value.clamp(0.005, 0.4);
-    final selected = selectedRegion;
-    if (selected != null && selected.isStroke) {
-      _replace(selected.copyWith(size: _brushSize), recordHistory: false);
-    }
-    notifyListeners();
+    _applyToPending(
+      (region) => region.isStroke ? region.copyWith(size: _brushSize) : region,
+    );
+    _applyToSelection(
+      (region) => region.isStroke ? region.copyWith(size: _brushSize) : region,
+    );
   }
 
   void setStrength(double value) {
     _strength = value.clamp(0.02, 1.0);
-    final selected = selectedRegion;
-    if (selected != null && selected.style != MaskStyle.solid) {
-      _replace(selected.copyWith(strength: _strength), recordHistory: false);
-      _warmTextures();
-    }
-    notifyListeners();
+    _applyToPending(
+      (region) => region.style == MaskStyle.solid
+          ? region
+          : region.copyWith(strength: _strength),
+    );
+    _applyToSelection(
+      (region) => region.style == MaskStyle.solid
+          ? region
+          : region.copyWith(strength: _strength),
+    );
+    _warmTextures(immediate: true);
   }
 
   void setRadius(double value) {
     _radius = value.clamp(0.0, 0.5);
-    final selected = selectedRegion;
-    if (selected != null && selected.shape == MaskShape.roundedRect) {
-      _replace(selected.copyWith(radius: _radius), recordHistory: false);
-    }
-    notifyListeners();
+    _applyToPending(
+      (region) => region.isFill ? region.copyWith(radius: _radius) : region,
+    );
+    _applyToSelection(
+      (region) => region.isFill ? region.copyWith(radius: _radius) : region,
+    );
   }
 
   void setSolidColor(Color value) {
     _solidColor = value;
-    final selected = selectedRegion;
-    if (selected != null && selected.style == MaskStyle.solid) {
-      _replace(selected.copyWith(color: value), recordHistory: true);
-    }
-    notifyListeners();
+    _applyToPending(
+      (region) => region.style == MaskStyle.solid
+          ? region.copyWith(color: value)
+          : region,
+    );
+    _applyToSelection(
+      (region) => region.style == MaskStyle.solid
+          ? region.copyWith(color: value)
+          : region,
+    );
   }
 
-  /// Starts a drag that changes a parameter or the geometry of the selected
-  /// region continuously. Only one history entry is recorded for the whole
-  /// gesture, and tapping without moving records nothing.
+  /// Candidates follow the style controls too.
+  ///
+  /// Without this the boxes you are about to accept would keep whatever radius
+  /// the tool had when you pressed scan, and the only way to get a round avatar
+  /// mask would be to guess beforehand. No history is recorded: nothing is in
+  /// the document yet.
+  void _applyToPending(MaskRegion Function(MaskRegion region) change) {
+    if (_pending.isEmpty) return;
+    var touched = false;
+    for (var i = 0; i < _pending.length; i++) {
+      final next = change(_pending[i]);
+      if (!identical(next, _pending[i])) {
+        _pending[i] = next;
+        touched = true;
+      }
+    }
+    if (touched) notifyListeners();
+  }
+
+  /// Starts a drag that changes a parameter or the geometry of the selection
+  /// continuously. Only one history entry is recorded for the whole gesture,
+  /// and tapping without moving records nothing.
   void beginScrub() {
     _scrubSnapshot ??= List<MaskRegion>.of(_regions);
   }
@@ -177,11 +262,10 @@ class EditorController extends ChangeNotifier {
       return;
     }
     // A new stroke means the user is done adjusting the previous block.
-    _selectedId = null;
+    clearSelection();
     final shape = switch (_tool) {
       EditorTool.brush => MaskShape.stroke,
-      EditorTool.rect => MaskShape.rect,
-      EditorTool.roundedRect => MaskShape.roundedRect,
+      EditorTool.box => MaskShape.box,
       EditorTool.select => MaskShape.stroke,
     };
     _draft = MaskRegion(
@@ -210,8 +294,7 @@ class EditorController extends ChangeNotifier {
         final minDistance = math.max(0.0015, _brushSize * 0.12);
         if ((point - last).distance < minDistance) return;
         draft = draft.copyWith(points: [...draft.points, point]);
-      case MaskShape.rect:
-      case MaskShape.roundedRect:
+      case MaskShape.box:
         draft = draft.copyWith(points: [draft.points.first, point]);
     }
     _draft = draft;
@@ -249,8 +332,7 @@ class EditorController extends ChangeNotifier {
       case MaskShape.stroke:
         if (draft.points.isEmpty) return null;
         return draft;
-      case MaskShape.rect:
-      case MaskShape.roundedRect:
+      case MaskShape.box:
         if (draft.points.length < 2) return null;
         final bounds = draft.normalizedBounds;
         if (bounds.width < 0.004 || bounds.height < 0.004) return null;
@@ -260,52 +342,126 @@ class EditorController extends ChangeNotifier {
 
   // ---------------------------------------------------------------- selection
 
-  /// Selects the topmost mask under [point]. Returns true when something was
-  /// hit, which lets the canvas start a drag in the same gesture.
-  bool selectAt(Offset point) {
+  /// Selects the topmost mask under [point].
+  ///
+  /// Tapping an already selected mask removes it from the selection, which is
+  /// how a multi-selection is built up one tap at a time. A selection is always
+  /// homogeneous — all strokes or all boxes — because the parameter row has no
+  /// sensible meaning for a mixed set.
+  bool selectAt(Offset point, {bool toggle = true}) {
     const tolerance = 0.012;
     for (var i = _regions.length - 1; i >= 0; i--) {
       final region = _regions[i];
-      if (region.visible && region.hitTest(point, tolerance)) {
-        _selectedId = region.id;
-        _tool = EditorTool.select;
-        _style = region.style;
-        _strength = region.strength;
-        _radius = region.radius;
-        if (region.isStroke) _brushSize = region.size;
-        _solidColor = region.color;
-        notifyListeners();
-        return true;
+      if (!region.visible || !region.hitTest(point, tolerance)) continue;
+
+      final current = primaryRegion;
+      if (current != null && current.isStroke != region.isStroke) {
+        // A different kind of mask: start a fresh selection instead of mixing.
+        _selectedIds
+          ..clear()
+          ..add(region.id);
+        _primaryId = region.id;
+      } else if (toggle && _selectedIds.contains(region.id)) {
+        _selectedIds.remove(region.id);
+        if (_primaryId == region.id) {
+          _primaryId = _selectedIds.isEmpty ? null : _selectedIds.last;
+        }
+      } else {
+        _selectedIds.add(region.id);
+        _primaryId = region.id;
       }
-    }
-    if (_selectedId != null) {
-      _selectedId = null;
+
+      _tool = EditorTool.select;
+      _adoptParameters(region);
       notifyListeners();
+      return true;
+    }
+    if (_selectedIds.isNotEmpty) {
+      clearSelection();
     }
     return false;
   }
 
-  void clearSelection() {
-    if (_selectedId == null) return;
-    _selectedId = null;
+  /// Makes [id] the primary region (the one that owns the handles) without
+  /// changing what is selected. Used when a corner drag starts on one member of
+  /// a multi-selection.
+  void focusSelection(String id) {
+    final region = _find(id);
+    if (region == null || _primaryId == id) return;
+    _primaryId = id;
+    _adoptParameters(region);
     notifyListeners();
   }
 
-  /// Moves the selected region, keeping it inside the picture.
-  void translateSelected(Offset delta) {
-    final region = selectedRegion;
+  /// Selection without toggling, used when a drag starts on a mask.
+  void selectOnly(String id) {
+    final region = _find(id);
     if (region == null) return;
-    final bounds = region.normalizedBounds;
+    _selectedIds
+      ..clear()
+      ..add(id);
+    _primaryId = id;
+    _tool = EditorTool.select;
+    _adoptParameters(region);
+    notifyListeners();
+  }
+
+  void _adoptParameters(MaskRegion region) {
+    _style = region.style;
+    _strength = region.strength;
+    _radius = region.radius;
+    if (region.isStroke) _brushSize = region.size;
+    _solidColor = region.color;
+  }
+
+  MaskRegion? _find(String id) {
+    for (final region in _regions) {
+      if (region.id == id) return region;
+    }
+    return null;
+  }
+
+  void clearSelection() {
+    if (_selectedIds.isEmpty) return;
+    _selectedIds.clear();
+    _primaryId = null;
+    notifyListeners();
+  }
+
+  /// Moves the whole selection, keeping the group inside the picture.
+  void translateSelected(Offset delta) {
+    if (_selectedIds.isEmpty) return;
+    var bounds = Rect.zero;
+    var first = true;
+    for (final region in _regions) {
+      if (!_selectedIds.contains(region.id)) continue;
+      final box = region.normalizedBounds;
+      bounds = first
+          ? box
+          : Rect.fromLTRB(
+              math.min(bounds.left, box.left),
+              math.min(bounds.top, box.top),
+              math.max(bounds.right, box.right),
+              math.max(bounds.bottom, box.bottom),
+            );
+      first = false;
+    }
+    if (first) return;
     final dx = delta.dx.clamp(-bounds.left, 1 - bounds.right);
     final dy = delta.dy.clamp(-bounds.top, 1 - bounds.bottom);
     if (dx == 0 && dy == 0) return;
-    _replace(region.translated(Offset(dx, dy)), recordHistory: false);
+    for (var i = 0; i < _regions.length; i++) {
+      if (!_selectedIds.contains(_regions[i].id)) continue;
+      _regions[i] = _regions[i].translated(Offset(dx, dy));
+    }
     notifyListeners();
   }
 
-  /// Stretches the selected region into [target] (normalized space).
+  /// Stretches the primary region into [target] (normalized space). Other
+  /// selected regions are deliberately untouched: in a multi-selection a handle
+  /// resizes exactly the box you grabbed.
   void resizeSelected(Rect target) {
-    final region = selectedRegion;
+    final region = primaryRegion;
     if (region == null) return;
     final clamped = Rect.fromLTRB(
       target.left.clamp(0.0, 1.0),
@@ -314,23 +470,18 @@ class EditorController extends ChangeNotifier {
       target.bottom.clamp(0.0, 1.0),
     );
     if (clamped.width < 0.004 || clamped.height < 0.004) return;
-    _replace(region.scaledTo(clamped), recordHistory: false);
+    final index = _regions.indexWhere((item) => item.id == region.id);
+    if (index < 0) return;
+    _regions[index] = region.scaledTo(clamped);
     notifyListeners();
   }
 
   void deleteSelected() {
-    final id = _selectedId;
-    if (id == null) return;
+    if (_selectedIds.isEmpty) return;
     _pushHistory();
-    _regions.removeWhere((region) => region.id == id);
-    _selectedId = null;
-    notifyListeners();
-  }
-
-  void deleteRegion(String id) {
-    _pushHistory();
-    _regions.removeWhere((region) => region.id == id);
-    if (_selectedId == id) _selectedId = null;
+    _regions.removeWhere((region) => _selectedIds.contains(region.id));
+    _selectedIds.clear();
+    _primaryId = null;
     notifyListeners();
   }
 
@@ -338,7 +489,8 @@ class EditorController extends ChangeNotifier {
     if (_regions.isEmpty) return;
     _pushHistory();
     _regions.clear();
-    _selectedId = null;
+    _selectedIds.clear();
+    _primaryId = null;
     notifyListeners();
   }
 
@@ -347,9 +499,71 @@ class EditorController extends ChangeNotifier {
     if (list.isEmpty) return;
     _pushHistory();
     _regions.addAll(list);
-    _selectedId = null;
     notifyListeners();
     _warmTextures();
+  }
+
+  // ------------------------------------------------------- pending detection
+
+  bool get hasPending => _pending.isNotEmpty;
+  List<MaskRegion> get pending => List.unmodifiable(_pending);
+  int get pendingSelectedCount => _pendingIds.length;
+
+  bool isPendingSelected(String id) => _pendingIds.contains(id);
+
+  /// Hands over the candidates produced by detection. Nothing is added to the
+  /// document until [commitPending].
+  void setPending(List<MaskRegion> candidates) {
+    _pending = List<MaskRegion>.of(candidates);
+    _pendingIds
+      ..clear()
+      ..addAll(candidates.map((region) => region.id));
+    // Handles on an existing mask would fight with the candidate boxes.
+    _selectedIds.clear();
+    _primaryId = null;
+    notifyListeners();
+  }
+
+  void togglePending(String id) {
+    if (!_pendingIds.remove(id)) _pendingIds.add(id);
+    notifyListeners();
+  }
+
+  void setAllPending(bool selected) {
+    _pendingIds.clear();
+    if (selected) {
+      _pendingIds.addAll(_pending.map((region) => region.id));
+    }
+    notifyListeners();
+  }
+
+  void cancelPending() {
+    if (_pending.isEmpty) return;
+    _pending = <MaskRegion>[];
+    _pendingIds.clear();
+    notifyListeners();
+  }
+
+  /// Turns the chosen candidates into real masks, replacing any masks left over
+  /// from an earlier detection pass.
+  int commitPending() {
+    final chosen = [
+      for (final region in _pending)
+        if (_pendingIds.contains(region.id)) region,
+    ];
+    _pending = <MaskRegion>[];
+    _pendingIds.clear();
+    if (chosen.isEmpty) {
+      notifyListeners();
+      return 0;
+    }
+    _pushHistory();
+    _regions
+      ..removeWhere((region) => region.isDetected)
+      ..addAll(chosen);
+    notifyListeners();
+    _warmTextures();
+    return chosen.length;
   }
 
   // ------------------------------------------------------------------- state
@@ -390,7 +604,8 @@ class EditorController extends ChangeNotifier {
     _regions
       ..clear()
       ..addAll(_undoStack.removeLast());
-    _selectedId = null;
+    _selectedIds.clear();
+    _primaryId = null;
     notifyListeners();
     _warmTextures();
   }
@@ -401,16 +616,10 @@ class EditorController extends ChangeNotifier {
     _regions
       ..clear()
       ..addAll(_redoStack.removeLast());
-    _selectedId = null;
+    _selectedIds.clear();
+    _primaryId = null;
     notifyListeners();
     _warmTextures();
-  }
-
-  void _replace(MaskRegion region, {required bool recordHistory}) {
-    final index = _regions.indexWhere((item) => item.id == region.id);
-    if (index < 0) return;
-    if (recordHistory) _pushHistory();
-    _regions[index] = region;
   }
 
   void _pushHistory() {

@@ -215,7 +215,7 @@ abstract class AppLocalizations {
   /// No description provided for @featureLocalBody.
   ///
   /// In en, this message translates to:
-  /// **'No upload, no account, no tracking. The app has no network permission.'**
+  /// **'No upload, no account, no tracking. The only network use is checking for updates, and you can switch that off.'**
   String get featureLocalBody;
 
   /// No description provided for @featureLayersTitle.
@@ -233,13 +233,13 @@ abstract class AppLocalizations {
   /// No description provided for @featureOcrTitle.
   ///
   /// In en, this message translates to:
-  /// **'Finds text offline'**
+  /// **'Finds what to cover'**
   String get featureOcrTitle;
 
   /// No description provided for @featureOcrBody.
   ///
   /// In en, this message translates to:
-  /// **'Detect sensitive text and cover it in one tap. Everything runs on-device.'**
+  /// **'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply — all on-device.'**
   String get featureOcrBody;
 
   /// No description provided for @recent.
@@ -302,11 +302,11 @@ abstract class AppLocalizations {
   /// **'Brush'**
   String get toolBrush;
 
-  /// No description provided for @toolRect.
+  /// No description provided for @toolBox.
   ///
   /// In en, this message translates to:
-  /// **'Rectangle'**
-  String get toolRect;
+  /// **'Box'**
+  String get toolBox;
 
   /// No description provided for @toolSelect.
   ///
@@ -356,11 +356,11 @@ abstract class AppLocalizations {
   /// **'Paint over anything private'**
   String get brushHint;
 
-  /// No description provided for @rectHint.
+  /// No description provided for @boxHint.
   ///
   /// In en, this message translates to:
-  /// **'Drag to draw a box'**
-  String get rectHint;
+  /// **'Drag to frame an area · corners soften it'**
+  String get boxHint;
 
   /// No description provided for @selectHint.
   ///
@@ -380,47 +380,65 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{No masks} =1{1 mask} other{{count} masks}}'**
   String maskCount(int count);
 
-  /// No description provided for @ocrAction.
+  /// No description provided for @scanAction.
   ///
   /// In en, this message translates to:
-  /// **'Find text'**
-  String get ocrAction;
+  /// **'Scan'**
+  String get scanAction;
 
-  /// No description provided for @ocrScanning.
+  /// No description provided for @scanFoundText.
   ///
   /// In en, this message translates to:
-  /// **'Reading text…'**
-  String get ocrScanning;
+  /// **'{count, plural, =1{1 text block} other{{count} text blocks}}'**
+  String scanFoundText(int count);
 
-  /// No description provided for @ocrFound.
+  /// No description provided for @scanFoundAvatar.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 text block found} other{{count} text blocks found}}'**
-  String ocrFound(int count);
+  /// **'{count, plural, =1{1 avatar} other{{count} avatars}}'**
+  String scanFoundAvatar(int count);
 
-  /// No description provided for @ocrNone.
+  /// No description provided for @scanFoundQr.
   ///
   /// In en, this message translates to:
-  /// **'No text found'**
-  String get ocrNone;
+  /// **'{count, plural, =1{1 QR code} other{{count} QR codes}}'**
+  String scanFoundQr(int count);
 
-  /// No description provided for @ocrApplyAll.
+  /// No description provided for @scanNone.
   ///
   /// In en, this message translates to:
-  /// **'Cover all'**
-  String get ocrApplyAll;
+  /// **'Nothing worth covering was found'**
+  String get scanNone;
 
-  /// No description provided for @ocrUnavailable.
+  /// No description provided for @scanFailed.
   ///
   /// In en, this message translates to:
-  /// **'Text detection is available on Android only for now.'**
-  String get ocrUnavailable;
+  /// **'Scan failed'**
+  String get scanFailed;
 
-  /// No description provided for @ocrFailed.
+  /// No description provided for @pendingHint.
   ///
   /// In en, this message translates to:
-  /// **'Text detection failed'**
-  String get ocrFailed;
+  /// **'Tap the boxes you want to cover'**
+  String get pendingHint;
+
+  /// No description provided for @pendingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total}'**
+  String pendingCount(int selected, int total);
+
+  /// No description provided for @pendingAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get pendingAll;
+
+  /// No description provided for @pendingClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Select none'**
+  String get pendingClear;
 
   /// No description provided for @compareHint.
   ///
@@ -557,7 +575,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyBody.
   ///
   /// In en, this message translates to:
-  /// **'Velatus processes everything on your device. There is no account system and the release build requests no network permission.'**
+  /// **'Velatus processes everything on your device. There is no account, no telemetry and no image ever leaves the phone. The app has network access for one purpose only: checking for and downloading updates.'**
   String get privacyBody;
 
   /// No description provided for @openSource.
@@ -659,7 +677,7 @@ abstract class AppLocalizations {
   /// No description provided for @footerNote.
   ///
   /// In en, this message translates to:
-  /// **'MIT · no network · no account'**
+  /// **'MIT · offline · no account'**
   String get footerNote;
 
   /// No description provided for @leaveTitle.
@@ -680,18 +698,6 @@ abstract class AppLocalizations {
   /// **'Leave'**
   String get leave;
 
-  /// No description provided for @toolRoundedRect.
-  ///
-  /// In en, this message translates to:
-  /// **'Rounded box'**
-  String get toolRoundedRect;
-
-  /// No description provided for @roundedRectHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Drag a frame with soft corners'**
-  String get roundedRectHint;
-
   /// No description provided for @cornerRadius.
   ///
   /// In en, this message translates to:
@@ -701,14 +707,20 @@ abstract class AppLocalizations {
   /// No description provided for @customColor.
   ///
   /// In en, this message translates to:
-  /// **'Custom colour'**
+  /// **'Colour'**
   String get customColor;
 
   /// No description provided for @selectionHint.
   ///
   /// In en, this message translates to:
-  /// **'Drag to move · corners to resize'**
+  /// **'Drag to move · corners resize'**
   String get selectionHint;
+
+  /// No description provided for @selectionHintMulti.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} masks selected · corners resize only the one you grab'**
+  String selectionHintMulti(int count);
 
   /// No description provided for @moreActions.
   ///
@@ -725,8 +737,86 @@ abstract class AppLocalizations {
   /// No description provided for @checkUpdateNote.
   ///
   /// In en, this message translates to:
-  /// **'Opens the releases page in your browser'**
+  /// **'Downloads and installs inside the app'**
   String get checkUpdateNote;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates…'**
+  String get updateChecking;
+
+  /// No description provided for @updateLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version ({version}).'**
+  String updateLatest(String version);
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and install'**
+  String get updateDownload;
+
+  /// No description provided for @updateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get updateLater;
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading… {percent}%'**
+  String updateDownloading(int percent);
+
+  /// No description provided for @updateInstallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Android will ask you to allow installs from Velatus, then show its own install screen. Your edits are not affected.'**
+  String get updateInstallHint;
+
+  /// No description provided for @updateDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to {path}'**
+  String updateDownloaded(String path);
+
+  /// No description provided for @updateShowFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Show file'**
+  String get updateShowFile;
+
+  /// No description provided for @updateFailedCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'No update source could be reached'**
+  String get updateFailedCheck;
+
+  /// No description provided for @updateFailedDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'The download failed'**
+  String get updateFailedDownload;
+
+  /// No description provided for @updateOpenReleases.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the release page'**
+  String get updateOpenReleases;
+
+  /// No description provided for @updateSource.
+  ///
+  /// In en, this message translates to:
+  /// **'via {host}'**
+  String updateSource(String host);
 
   /// No description provided for @repository.
   ///

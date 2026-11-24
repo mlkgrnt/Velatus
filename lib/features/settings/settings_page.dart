@@ -4,6 +4,7 @@ import '../../app.dart';
 import '../../core/app_info.dart';
 import '../../core/settings_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'widgets/update_dialog.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.settings});
@@ -157,12 +158,8 @@ class SettingsPage extends StatelessWidget {
                       icon: Icons.system_update_alt_rounded,
                       title: l10n.checkUpdate,
                       subtitle: l10n.checkUpdateNote,
-                      onTap: () async {
-                        final opened = await AppLinks.openReleases();
-                        if (!opened && context.mounted) {
-                          _toast(context, kReleasesUrl);
-                        }
-                      },
+                      external: false,
+                      onTap: () => showUpdateFlow(context),
                     ),
                     Divider(
                       height: 1,
@@ -288,12 +285,17 @@ class _LinkRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.external = true,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
+  /// Whether the row leaves the app. The update check does not, so it gets a
+  /// chevron instead of the "opens a browser" arrow.
+  final bool external;
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +326,9 @@ class _LinkRow extends StatelessWidget {
               ),
             ),
             Icon(
-              Icons.open_in_new_rounded,
+              external
+                  ? Icons.open_in_new_rounded
+                  : Icons.chevron_right_rounded,
               size: 16,
               color: theme.colorScheme.outline,
             ),

@@ -37,11 +37,15 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build apk --release
+      # One APK per ABI. The universal build packed three copies of the Flutter
+      # engine and the 11 MB ML Kit text model into a single 86 MB file; split
+      # builds are roughly a third of that, and the updater picks the one that
+      # matches the device.
+      - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
           name: velatus-android
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-*-release.apk
 
   windows:
     name: Build Windows

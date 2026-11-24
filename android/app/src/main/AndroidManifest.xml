@@ -1,8 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- Velatus never talks to the network in release builds. ML Kit runs its
-         bundled model on-device, and the app has no account system. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- INTERNET exists for exactly one feature: checking for and downloading a
+         new version. Images never leave the device, there is no account and no
+         telemetry. If you would rather update by hand, this permission grants
+         nothing that the app actually uses unless you tap "Check for updates". -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets Velatus hand a downloaded APK to the system installer instead of
+         making you find it in a browser. Android still asks you to allow
+         installs from this app, and still shows its own install prompt. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Only needed on Android 9 and below to save into the gallery. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -38,6 +44,17 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- The downloaded APK lives in the app's cache, so the installer can
+             only read it through this provider. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -54,12 +71,17 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- "Check for updates" and "Source code" hand an https URL to the
-             browser. Package visibility on API 30+ hides the browser without
-             this, so the link would silently do nothing. -->
+        <!-- "Source code" hands an https URL to the browser. Package visibility
+             on API 30+ hides the browser without this, so the link would
+             silently do nothing. -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
+        </intent>
+        <!-- Lets the app see whether the system package installer is present. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="application/vnd.android.package-archive"/>
         </intent>
     </queries>
 </manifest>

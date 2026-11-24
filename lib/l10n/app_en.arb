@@ -19,11 +19,11 @@
   "dropHint": "Drop an image here",
   "dropSubtitle": "or click to browse · JPG, PNG, WebP, BMP",
   "featureLocalTitle": "Never leaves your device",
-  "featureLocalBody": "No upload, no account, no tracking. The app has no network permission.",
+  "featureLocalBody": "No upload, no account, no tracking. The only network use is checking for updates, and you can switch that off.",
   "featureLayersTitle": "Masks you can revise",
   "featureLayersBody": "Tap a block to select it, then resize it or delete it. Nothing is baked in.",
-  "featureOcrTitle": "Finds text offline",
-  "featureOcrBody": "Detect sensitive text and cover it in one tap. Everything runs on-device.",
+  "featureOcrTitle": "Finds what to cover",
+  "featureOcrBody": "Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply — all on-device.",
   "recent": "Recent",
   "clearRecent": "Clear",
   "untitled": "Untitled",
@@ -34,7 +34,7 @@
   "export": "Export",
   "fitToScreen": "Fit to screen",
   "toolBrush": "Brush",
-  "toolRect": "Rectangle",
+  "toolBox": "Box",
   "toolSelect": "Select",
   "maskMosaic": "Mosaic",
   "maskBlur": "Blur",
@@ -43,7 +43,7 @@
   "size": "Size",
   "color": "Color",
   "brushHint": "Paint over anything private",
-  "rectHint": "Drag to draw a box",
+  "boxHint": "Drag to frame an area · corners soften it",
   "selectHint": "Tap a mask to adjust or delete it",
   "deleteMask": "Delete mask",
   "maskCount": "{count, plural, =0{No masks} =1{1 mask} other{{count} masks}}",
@@ -54,20 +54,47 @@
       }
     }
   },
-  "ocrAction": "Find text",
-  "ocrScanning": "Reading text…",
-  "ocrFound": "{count, plural, =1{1 text block found} other{{count} text blocks found}}",
-  "@ocrFound": {
+  "scanAction": "Scan",
+  "scanFoundText": "{count, plural, =1{1 text block} other{{count} text blocks}}",
+  "@scanFoundText": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "ocrNone": "No text found",
-  "ocrApplyAll": "Cover all",
-  "ocrUnavailable": "Text detection is available on Android only for now.",
-  "ocrFailed": "Text detection failed",
+  "scanFoundAvatar": "{count, plural, =1{1 avatar} other{{count} avatars}}",
+  "@scanFoundAvatar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundQr": "{count, plural, =1{1 QR code} other{{count} QR codes}}",
+  "@scanFoundQr": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanNone": "Nothing worth covering was found",
+  "scanFailed": "Scan failed",
+  "pendingHint": "Tap the boxes you want to cover",
+  "pendingCount": "{selected}/{total}",
+  "@pendingCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingAll": "Select all",
+  "pendingClear": "Select none",
   "compareHint": "Hold to see the original",
   "resetView": "Reset view",
   "exportTitle": "Export",
@@ -97,7 +124,7 @@
   "language": "Language",
   "languageSystem": "System default",
   "privacy": "Privacy",
-  "privacyBody": "Velatus processes everything on your device. There is no account system and the release build requests no network permission.",
+  "privacyBody": "Velatus processes everything on your device. There is no account, no telemetry and no image ever leaves the phone. The app has network access for one purpose only: checking for and downloading updates.",
   "openSource": "Open source",
   "licenses": "Open-source licenses",
   "aboutBody": "A quiet little tool for covering the things that should not be seen.",
@@ -124,18 +151,72 @@
   "brushSize": "Brush size",
   "blurNote": "Blur strength scales with the image, so exports match the preview.",
   "exifStripped": "EXIF stripped",
-  "footerNote": "MIT · no network · no account",
+  "footerNote": "MIT · offline · no account",
   "leaveTitle": "Leave without exporting?",
   "leaveBody": "This edit is not saved anywhere. Export the image first if you want to keep it.",
   "leave": "Leave",
-  "toolRoundedRect": "Rounded box",
-  "roundedRectHint": "Drag a frame with soft corners",
   "cornerRadius": "Corner radius",
-  "customColor": "Custom colour",
-  "selectionHint": "Drag to move · corners to resize",
+  "customColor": "Colour",
+  "selectionHint": "Drag to move · corners resize",
+  "selectionHintMulti": "{count} masks selected · corners resize only the one you grab",
+  "@selectionHintMulti": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "moreActions": "More",
   "checkUpdate": "Check for updates",
-  "checkUpdateNote": "Opens the releases page in your browser",
+  "checkUpdateNote": "Downloads and installs inside the app",
+  "updateChecking": "Checking for updates…",
+  "updateLatest": "You are on the latest version ({version}).",
+  "@updateLatest": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateAvailable": "Version {version} is available",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownload": "Download and install",
+  "updateLater": "Later",
+  "updateDownloading": "Downloading… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateInstallHint": "Android will ask you to allow installs from Velatus, then show its own install screen. Your edits are not affected.",
+  "updateDownloaded": "Saved to {path}",
+  "@updateDownloaded": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "updateShowFile": "Show file",
+  "updateFailedCheck": "No update source could be reached",
+  "updateFailedDownload": "The download failed",
+  "updateOpenReleases": "Open the release page",
+  "updateSource": "via {host}",
+  "@updateSource": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
   "repository": "Source code",
   "featureExportTitle": "Full-resolution output",
   "featureExportBody": "Masks are redrawn at the source pixel grid, not upscaled from the preview."

@@ -7,21 +7,33 @@ import 'color_picker_dialog.dart';
 
 /// The bottom bar.
 ///
-/// Two layers only: tools on top, and a single context row underneath that
-/// swaps its contents for whatever the current tool actually needs. Keeping the
-/// brush size and the strength on their own stacked sliders frees the
-/// horizontal room the colour swatches were missing.
+/// Exactly two rows, both with a fixed height:
+///
+///  1. *what* — the three tools, plus the actions that apply to the document.
+///  2. *with what* — the style chips and the two numbers that describe the
+///     current mask.
+///
+/// The earlier layout stacked a variable number of sliders and gave the colour
+/// palette a row of its own, so the dock grew and shrank with every tool change
+/// and the photo above it jumped. Fixing both row heights means the canvas size
+/// is a constant, and the palette now lives one tap away inside the colour
+/// dialog instead of stealing a whole row.
 class ToolDock extends StatelessWidget {
   const ToolDock({
     super.key,
     required this.controller,
-    this.onOcr,
-    this.ocrBusy = false,
+    this.onScan,
+    this.scanBusy = false,
   });
 
   final EditorController controller;
-  final VoidCallback? onOcr;
-  final bool ocrBusy;
+
+  /// Runs the detectors. Null hides the action.
+  final VoidCallback? onScan;
+  final bool scanBusy;
+
+  static const double _rowOneHeight = 48;
+  static const double _rowTwoHeight = 40;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +43,7 @@ class ToolDock extends StatelessWidget {
 
     final tools = <(EditorTool, IconData, String)>[
       (EditorTool.brush, Icons.brush_outlined, l10n.toolBrush),
-      (EditorTool.rect, Icons.crop_square, l10n.toolRect),
-      (
-        EditorTool.roundedRect,
-        Icons.crop_square_rounded,
-        l10n.toolRoundedRect,
-      ),
+      (EditorTool.box, Icons.crop_square, l10n.toolBox),
       (EditorTool.select, Icons.touch_app_outlined, l10n.toolSelect),
     ];
 
@@ -61,116 +68,51 @@ class ToolDock extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      for (final tool in tools)
-                        Expanded(
-                          child: _ToolButton(
-                            icon: tool.$2,
-                            label: tool.$3,
-                            selected: controller.tool == tool.$1,
-                            onTap: () => controller.setTool(tool.$1),
+                  SizedBox(
+                    height: _rowOneHeight,
+                    child: Row(
+                      children: [
+                        for (final tool in tools)
+                          Expanded(
+                            child: _ToolButton(
+                              icon: tool.$2,
+                              label: tool.$3,
+                              selected: controller.tool == tool.$1,
+                              onTap: () => controller.setTool(tool.$1),
+                            ),
                           ),
+                        const SizedBox(width: 4),
+                        _DockAction(
+                          icon: Icons.document_scanner_outlined,
+                          tooltip: l10n.scanAction,
+                          onTap: scanBusy ? null : onScan,
+                          busy: scanBusy,
                         ),
-                      const SizedBox(width: 2),
-                      _CompactAction(
-                        icon: Icons.undo_rounded,
-                        tooltip: l10n.undo,
-                        onTap: controller.canUndo ? controller.undo : null,
-                      ),
-                      _CompactAction(
-                        icon: Icons.redo_rounded,
-                        tooltip: l10n.redo,
-                        onTap: controller.canRedo ? controller.redo : null,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _StyleChip(
-                        icon: Icons.grid_on_rounded,
-                        label: l10n.maskMosaic,
-                        selected: controller.style == MaskStyle.mosaic,
-                        onTap: () => controller.setStyle(MaskStyle.mosaic),
-                      ),
-                      const SizedBox(width: 4),
-                      _StyleChip(
-                        icon: Icons.blur_on_rounded,
-                        label: l10n.maskBlur,
-                        selected: controller.style == MaskStyle.blur,
-                        onTap: () => controller.setStyle(MaskStyle.blur),
-                      ),
-                      const SizedBox(width: 4),
-                      _StyleChip(
-                        icon: Icons.square,
-                        label: l10n.maskSolid,
-                        selected: controller.style == MaskStyle.solid,
-                        onTap: () => controller.setStyle(MaskStyle.solid),
-                      ),
-                      if (controller.style != MaskStyle.solid) ...[
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 1,
-                          height: 26,
-                          color: theme.colorScheme.outlineVariant.withValues(
-                            alpha: 0.7,
-                          ),
+                        _DockAction(
+                          icon: Icons.undo_rounded,
+                          tooltip: l10n.undo,
+                          onTap: controller.canUndo ? controller.undo : null,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(child: _ContextRow(controller: controller)),
-                      ] else
-                        const Spacer(),
-                      if (onOcr != null) ...[
-                        const SizedBox(width: 2),
-                        IconButton(
-                          onPressed: ocrBusy ? null : onOcr,
-                          icon: ocrBusy
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.document_scanner_outlined,
-                                  size: 19,
-                                ),
-                          tooltip: l10n.ocrAction,
-                          visualDensity: VisualDensity.compact,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(34, 34),
-                          ),
+                        _DockAction(
+                          icon: Icons.redo_rounded,
+                          tooltip: l10n.redo,
+                          onTap: controller.canRedo ? controller.redo : null,
                         ),
-                      ],
-                      if (controller.hasSelection) ...[
-                        const SizedBox(width: 2),
-                        IconButton(
-                          onPressed: controller.deleteSelected,
-                          icon: const Icon(
-                            Icons.delete_outline_rounded,
-                            size: 20,
-                          ),
+                        _DockAction(
+                          icon: Icons.delete_outline_rounded,
                           tooltip: l10n.deleteMask,
-                          visualDensity: VisualDensity.compact,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(34, 34),
-                            foregroundColor: theme.colorScheme.error,
-                          ),
+                          onTap: controller.hasSelection
+                              ? controller.deleteSelected
+                              : null,
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                  if (controller.style == MaskStyle.solid) ...[
-                    const SizedBox(height: 6),
-                    // Colours get their own full-width row. Sharing the line
-                    // with the style chips left only four of eight swatches
-                    // visible on a 360 dp phone, which is exactly the "显示不全"
-                    // the colour picker was meant to fix.
-                    _ColorRow(controller: controller),
-                  ],
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    height: _rowTwoHeight,
+                    child: _ParametersRow(controller: controller),
+                  ),
                 ],
               ),
             ),
@@ -181,171 +123,146 @@ class ToolDock extends StatelessWidget {
   }
 }
 
-class _ContextRow extends StatelessWidget {
-  const _ContextRow({required this.controller});
+/// Style chips on the left, then one or two parameter sliders.
+class _ParametersRow extends StatelessWidget {
+  const _ParametersRow({required this.controller});
 
   final EditorController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = controller.selectedRegion;
-    final showSize = controller.tool == EditorTool.brush ||
-        (selected?.isStroke ?? false);
-    final showRadius = (controller.tool == EditorTool.roundedRect &&
-            selected == null) ||
-        selected?.shape == MaskShape.roundedRect;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _MiniSlider(
-          icon: Icons.opacity_rounded,
-          tooltip: AppLocalizations.of(context).strength,
-          value: controller.strength,
-          min: 0.05,
-          max: 1,
-          onStart: controller.beginScrub,
-          onEnd: controller.endScrub,
-          onChanged: controller.setStrength,
-        ),
-        if (showSize)
-          _MiniSlider(
-            icon: Icons.line_weight_rounded,
-            tooltip: AppLocalizations.of(context).brushSize,
-            value: controller.brushSize,
-            min: 0.01,
-            max: 0.2,
-            onStart: controller.beginScrub,
-            onEnd: controller.endScrub,
-            onChanged: controller.setBrushSize,
-          ),
-        if (showRadius)
-          _MiniSlider(
-            icon: Icons.rounded_corner,
-            tooltip: AppLocalizations.of(context).cornerRadius,
-            value: controller.radius,
-            min: 0,
-            max: 0.5,
-            onStart: controller.beginScrub,
-            onEnd: controller.endScrub,
-            onChanged: controller.setRadius,
-          ),
-      ],
-    );
-  }
-}
-
-class _ColorRow extends StatelessWidget {
-  const _ColorRow({required this.controller});
-
-  final EditorController controller;
-
-  static const _colors = [
-    Color(0xFF14161C),
-    Color(0xFFFFFFFF),
-    Color(0xFF3D4A63),
-    Color(0xFFB3261E),
-    Color(0xFF1B5E20),
-    Color(0xFF4A63D8),
-    Color(0xFFE0A106),
-    Color(0xFF7B1FA2),
-  ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    return SizedBox(
-      height: 34,
-      child: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final color in _colors)
-                    _Swatch(
-                      color: color,
-                      selected:
-                          controller.solidColor.toARGB32() == color.toARGB32(),
-                      onTap: () => controller.setSolidColor(color),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Tooltip(
-            message: l10n.customColor,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () async {
-                final picked = await showColorPickerDialog(
-                  context,
-                  initial: controller.solidColor,
-                );
-                if (picked != null) controller.setSolidColor(picked);
-              },
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
+
+    // Which geometry slider makes sense right now. A brush stroke has a width;
+    // a box has a corner radius; the select tool has whichever the primary
+    // region happens to be, and nothing at all when nothing is selected.
+    final bool? strokeGeometry = switch (controller.tool) {
+      EditorTool.brush => true,
+      EditorTool.box => false,
+      EditorTool.select => controller.primaryRegion?.isStroke,
+    };
+
+    final solid = controller.style == MaskStyle.solid;
+
+    return Row(
+      children: [
+        _StyleChip(
+          icon: Icons.grid_on_rounded,
+          label: l10n.maskMosaic,
+          selected: controller.style == MaskStyle.mosaic,
+          onTap: () => controller.setStyle(MaskStyle.mosaic),
+        ),
+        const SizedBox(width: 4),
+        _StyleChip(
+          icon: Icons.blur_on_rounded,
+          label: l10n.maskBlur,
+          selected: controller.style == MaskStyle.blur,
+          onTap: () => controller.setStyle(MaskStyle.blur),
+        ),
+        const SizedBox(width: 4),
+        _StyleChip(
+          icon: Icons.square,
+          label: l10n.maskSolid,
+          selected: solid,
+          onTap: () => controller.setStyle(MaskStyle.solid),
+        ),
+        const SizedBox(width: 10),
+        _VerticalRule(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Row(
+            children: [
+              if (!solid)
+                Expanded(
+                  child: _ParamSlider(
+                    icon: Icons.opacity_rounded,
+                    tooltip: l10n.strength,
+                    value: controller.strength,
+                    min: 0.05,
+                    max: 1,
+                    onStart: controller.beginScrub,
+                    onEnd: controller.endScrub,
+                    onChanged: controller.setStrength,
+                  ),
                 ),
-                child: Icon(
-                  Icons.colorize_rounded,
-                  size: 15,
-                  color: theme.colorScheme.onSurfaceVariant,
+              if (!solid && strokeGeometry != null) const SizedBox(width: 10),
+              if (strokeGeometry != null)
+                Expanded(
+                  child: strokeGeometry
+                      ? _ParamSlider(
+                          icon: Icons.line_weight_rounded,
+                          tooltip: l10n.brushSize,
+                          value: controller.brushSize,
+                          min: 0.01,
+                          max: 0.2,
+                          onStart: controller.beginScrub,
+                          onEnd: controller.endScrub,
+                          onChanged: controller.setBrushSize,
+                        )
+                      : _ParamSlider(
+                          icon: Icons.rounded_corner,
+                          tooltip: l10n.cornerRadius,
+                          value: controller.radius,
+                          min: 0,
+                          max: 0.5,
+                          onStart: controller.beginScrub,
+                          onEnd: controller.endScrub,
+                          onChanged: controller.setRadius,
+                        ),
                 ),
-              ),
-            ),
+            ],
           ),
+        ),
+        if (solid) ...[
+          const SizedBox(width: 8),
+          _ColorButton(controller: controller),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _Swatch extends StatelessWidget {
-  const _Swatch({
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
+/// The single colour control: a swatch that opens the palette.
+///
+/// Presets used to sit inline, eight circles at a time, which cost a whole dock
+/// row and still scrolled on a 360 dp phone. They are now the first thing the
+/// dialog shows.
+class _ColorButton extends StatelessWidget {
+  const _ColorButton({required this.controller});
 
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
+  final EditorController controller;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(right: 5),
+    return Tooltip(
+      message: AppLocalizations.of(context).color,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
+        onTap: () async {
+          final picked = await showColorPickerDialog(
+            context,
+            initial: controller.solidColor,
+          );
+          if (picked != null) controller.setSolidColor(picked);
+        },
         child: Container(
-          width: 30,
-          height: 30,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? theme.colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Center(
             child: Container(
-              width: 22,
-              height: 22,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                // A dark swatch on a dark bar (or white on white) needs an edge
-                // of its own, otherwise it reads as a hole.
+                color: controller.solidColor,
+                borderRadius: BorderRadius.circular(7),
                 border: Border.all(
                   color: theme.colorScheme.outlineVariant.withValues(
                     alpha: 0.9,
@@ -358,6 +275,16 @@ class _Swatch extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VerticalRule extends StatelessWidget {
+  const _VerticalRule({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 22, color: color);
 }
 
 class _ToolButton extends StatelessWidget {
@@ -385,22 +312,24 @@ class _ToolButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         decoration: BoxDecoration(
           color: selected ? theme.colorScheme.secondaryContainer : null,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 20, color: color),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(
                 fontSize: 10.5,
+                height: 1.1,
                 color: color,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
@@ -412,25 +341,34 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
-class _CompactAction extends StatelessWidget {
-  const _CompactAction({
+class _DockAction extends StatelessWidget {
+  const _DockAction({
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.busy = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onTap;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: onTap,
-      icon: Icon(icon, size: 20),
+      icon: busy
+          ? const SizedBox(
+              width: 15,
+              height: 15,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon, size: 19),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
-      style: IconButton.styleFrom(minimumSize: const Size(34, 34)),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(minimumSize: const Size(33, 38)),
     );
   }
 }
@@ -455,15 +393,16 @@ class _StyleChip extends StatelessWidget {
       message: label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          width: 34,
-          height: 34,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color:
-                selected ? theme.colorScheme.primary.withValues(alpha: 0.13) : null,
-            borderRadius: BorderRadius.circular(10),
+            color: selected
+                ? theme.colorScheme.primary.withValues(alpha: 0.13)
+                : null,
+            borderRadius: BorderRadius.circular(9),
             border: Border.all(
               color: selected
                   ? theme.colorScheme.primary.withValues(alpha: 0.6)
@@ -472,7 +411,7 @@ class _StyleChip extends StatelessWidget {
           ),
           child: Icon(
             icon,
-            size: 17,
+            size: 16,
             color: selected
                 ? theme.colorScheme.primary
                 : theme.colorScheme.onSurfaceVariant,
@@ -483,8 +422,13 @@ class _StyleChip extends StatelessWidget {
   }
 }
 
-class _MiniSlider extends StatelessWidget {
-  const _MiniSlider({
+/// A slider with no numeric readout.
+///
+/// On a phone the track earns the space: two sliders have to share one row, and
+/// a percentage label is worth less than 20 px of track when the whole point is
+/// judging the effect on the picture itself.
+class _ParamSlider extends StatelessWidget {
+  const _ParamSlider({
     required this.icon,
     required this.tooltip,
     required this.value,
@@ -507,22 +451,29 @@ class _MiniSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      height: 30,
-      child: Tooltip(
-        message: tooltip,
-        child: Row(
-          children: [
-            Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 2),
-            Expanded(
+    final percent = ((value.clamp(min, max) - min) / (max - min) * 100).round();
+    return Tooltip(
+      message: tooltip,
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 1),
+          Expanded(
+            child: Semantics(
+              label: tooltip,
+              value: '$percent%',
               child: SliderTheme(
                 data: theme.sliderTheme.copyWith(
                   trackHeight: 3,
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 6,
                   ),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 13),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 12,
+                  ),
+                  overlayColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.12,
+                  ),
                 ),
                 child: Slider(
                   value: value.clamp(min, max),
@@ -534,20 +485,8 @@ class _MiniSlider extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(
-              width: 34,
-              child: Text(
-                '${(value * 100).round()}%',
-                textAlign: TextAlign.right,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

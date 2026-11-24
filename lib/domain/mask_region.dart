@@ -8,11 +8,11 @@ enum MaskStyle { mosaic, blur, solid }
 
 /// The geometry used to describe a region.
 ///
-/// Ellipse and lasso used to live here as well. In practice both were rarely
-/// the right shape for a redaction and they made "select a block and adjust it"
-/// much harder to reason about, so the set is now deliberately small: a free
-/// hand stroke plus two rectangles that differ only in their corners.
-enum MaskShape { stroke, rect, roundedRect }
+/// There are only two shapes because there are only two useful gestures: paint
+/// over something, or frame it. A square corner is just a box with a radius of
+/// zero, so "rectangle" and "rounded rectangle" are the same tool with one
+/// slider instead of two buttons that behave identically.
+enum MaskShape { stroke, box }
 
 /// A single, non-destructive redaction object.
 ///
@@ -28,7 +28,7 @@ class MaskRegion {
     required this.points,
     this.size = 0.05,
     this.strength = 0.65,
-    this.radius = 0.24,
+    this.radius = 0.0,
     this.color = const Color(0xFF14161C),
     this.visible = true,
   });
@@ -44,8 +44,8 @@ class MaskRegion {
   /// 0..1. Mapped to pixel block size or blur sigma by the renderer.
   final double strength;
 
-  /// Corner radius of a [MaskShape.roundedRect], as a fraction of the shorter
-  /// side of its own bounding box. 0 is a square corner, 0.5 is a stadium.
+  /// Corner radius of a [MaskShape.box], as a fraction of the shorter side of
+  /// its own bounding box. 0 is a square corner, 0.5 is a stadium.
   final double radius;
 
   /// Used by [MaskStyle.solid].
@@ -56,10 +56,18 @@ class MaskRegion {
   bool get isStroke => shape == MaskShape.stroke;
 
   /// True for shapes that enclose an area, i.e. everything that is not a
-  /// brush stroke. Only these expose corner handles for resizing.
+  /// brush stroke.
   bool get isFill => shape != MaskShape.stroke;
 
+  /// Regions produced by a detector — text, avatars, QR codes — share this
+  /// prefix, so a second scan can replace them instead of stacking another layer
+  /// on top of the first one.
+  static const String detectedIdPrefix = 'det_';
+
+  bool get isDetected => id.startsWith(detectedIdPrefix);
+
   MaskRegion copyWith({
+    String? id,
     MaskStyle? style,
     MaskShape? shape,
     List<Offset>? points,
@@ -70,7 +78,7 @@ class MaskRegion {
     bool? visible,
   }) {
     return MaskRegion(
-      id: id,
+      id: id ?? this.id,
       style: style ?? this.style,
       shape: shape ?? this.shape,
       points: points ?? this.points,
@@ -105,12 +113,7 @@ class MaskRegion {
           final pt = p(points[i]);
           path.lineTo(pt.dx, pt.dy);
         }
-      case MaskShape.rect:
-        if (points.length < 2) {
-          return path;
-        }
-        path.addRect(Rect.fromPoints(p(points.first), p(points.last)));
-      case MaskShape.roundedRect:
+      case MaskShape.box:
         if (points.length < 2) {
           return path;
         }
@@ -120,9 +123,13 @@ class MaskRegion {
         }
         final corner =
             radius.clamp(0.0, 0.5) * math.min(rect.width, rect.height);
-        path.addRRect(
-          RRect.fromRectAndRadius(rect, Radius.circular(corner)),
-        );
+        if (corner <= 0.01) {
+          path.addRect(rect);
+        } else {
+          path.addRRect(
+            RRect.fromRectAndRadius(rect, Radius.circular(corner)),
+          );
+        }
     }
     return path;
   }
@@ -200,8 +207,7 @@ class MaskRegion {
           }
         }
         return false;
-      case MaskShape.rect:
-      case MaskShape.roundedRect:
+      case MaskShape.box:
         if (points.length < 2) {
           return false;
         }

@@ -43,7 +43,7 @@ class MaskRenderer {
 
   /// Gaussian sigma in pixels for a given strength.
   static double blurSigmaPx(double strength, double shortSide) {
-    final relative = 0.003 + 0.018 * strength.clamp(0.0, 1.0);
+    final relative = 0.004 + 0.028 * strength.clamp(0.0, 1.0);
     return math.max(1.0, shortSide * relative);
   }
 
@@ -213,6 +213,87 @@ class MaskRenderer {
           ..strokeWidth = 1.8
           ..color = accent,
       );
+    }
+  }
+
+  /// A proposed region that is not applied yet, e.g. one OCR hit.
+  ///
+  /// Candidates deliberately do *not* render the mask effect. Before the user
+  /// confirms, the canvas has to stay readable — you cannot judge whether a line
+  /// of text is worth redacting if it is already unreadable. Only the outline
+  /// and a faint wash are drawn, so the choice is "which boxes", not "which
+  /// blur".
+  static void paintCandidate(
+    ui.Canvas canvas,
+    ui.Rect imageRect,
+    MaskRegion candidate, {
+    required Color accent,
+    required bool selected,
+    required Color muted,
+  }) {
+    if (candidate.points.isEmpty) return;
+    final path = candidate.toPath(imageRect);
+    final rect = path.getBounds();
+    if (rect.isEmpty) return;
+
+    final colour = selected ? accent : muted;
+
+    // A wash rather than a fill: at 0.14 the text underneath stays readable
+    // while a checked box is still obvious at a glance.
+    canvas.drawPath(
+      path,
+      ui.Paint()..color = colour.withValues(alpha: selected ? 0.16 : 0.06),
+    );
+
+    canvas.drawPath(
+      path,
+      ui.Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = selected ? 2.0 : 1.4
+        ..color = colour.withValues(alpha: selected ? 1.0 : 0.8),
+    );
+
+    // Unselected hits get a dashed frame so a page full of OCR results reads as
+    // "suggestions" instead of "already applied".
+    if (selected) {
+      // Handles are omitted on purpose: a candidate is a yes/no choice, not a
+      // shape the user can drag yet.
+      paintSelection(
+        canvas,
+        imageRect,
+        candidate,
+        accent: accent,
+        handles: false,
+      );
+      return;
+    }
+    _dashedRRect(canvas, rect, muted);
+  }
+
+  /// Corner ticks on an unselected candidate, cheap stand-in for a dashed rect.
+  static void _dashedRRect(ui.Canvas canvas, ui.Rect rect, Color colour) {
+    final paint = ui.Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = colour.withValues(alpha: 0.55);
+    const dash = 5.0;
+    const gap = 4.0;
+    // Four edges, each walked by hand so the dash phase is continuous enough
+    // to look deliberate without carrying a PathEffect down to the canvas.
+    for (final (start, end) in [
+      (rect.topLeft, rect.topRight),
+      (rect.topRight, rect.bottomRight),
+      (rect.bottomRight, rect.bottomLeft),
+      (rect.bottomLeft, rect.topLeft),
+    ]) {
+      final total = (end - start).distance;
+      var t = 0.0;
+      while (t < total) {
+        final head = start + (end - start) * (t / total);
+        final tail = start + (end - start) * (math.min(t + dash, total) / total);
+        canvas.drawLine(head, tail, paint);
+        t += dash + gap;
+      }
     }
   }
 

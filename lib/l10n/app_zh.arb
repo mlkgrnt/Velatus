@@ -19,11 +19,11 @@
   "dropHint": "把图片拖到这里",
   "dropSubtitle": "或点击浏览 · 支持 JPG、PNG、WebP、BMP",
   "featureLocalTitle": "全程不出本机",
-  "featureLocalBody": "不上传、不登录、不统计。应用没有联网权限。",
+  "featureLocalBody": "不上传、不登录、不统计。唯一的联网用途是检查更新，而且可以关掉。",
   "featureLayersTitle": "打码可以反悔",
   "featureLayersBody": "点一下就能选中某处遮挡，随时改大小或删掉，画上去的都能反悔。",
-  "featureOcrTitle": "离线找文字",
-  "featureOcrBody": "自动识别敏感文字，一键盖住，全部在本机完成。",
+  "featureOcrTitle": "自动找出该遮的地方",
+  "featureOcrBody": "文字、聊天头像、二维码都会先框出来，你自己挑要盖哪些，全部在本机完成。",
   "recent": "最近打开",
   "clearRecent": "清空",
   "untitled": "未命名",
@@ -34,7 +34,7 @@
   "export": "导出",
   "fitToScreen": "适应窗口",
   "toolBrush": "涂抹",
-  "toolRect": "矩形",
+  "toolBox": "框",
   "toolSelect": "选择",
   "maskMosaic": "马赛克",
   "maskBlur": "模糊",
@@ -43,7 +43,7 @@
   "size": "大小",
   "color": "颜色",
   "brushHint": "在需要遮住的区域上涂抹",
-  "rectHint": "拖动框选一个区域",
+  "boxHint": "拖动框选区域 · 圆角条可软化四角",
   "selectHint": "点选一处打码来调整或删除",
   "deleteMask": "删除这处打码",
   "maskCount": "{count, plural, =0{暂无打码} other{{count} 处打码}}",
@@ -54,20 +54,47 @@
       }
     }
   },
-  "ocrAction": "识别文字",
-  "ocrScanning": "正在识别文字…",
-  "ocrFound": "发现 {count} 处文字",
-  "@ocrFound": {
+  "scanAction": "扫描",
+  "scanFoundText": "{count} 处文字",
+  "@scanFoundText": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "ocrNone": "没有找到文字",
-  "ocrApplyAll": "全部盖住",
-  "ocrUnavailable": "文字识别目前仅在 Android 版提供。",
-  "ocrFailed": "文字识别失败",
+  "scanFoundAvatar": "{count} 个头像",
+  "@scanFoundAvatar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundQr": "{count} 个二维码",
+  "@scanFoundQr": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanNone": "没有找到需要遮挡的内容",
+  "scanFailed": "扫描失败",
+  "pendingHint": "点选要盖住的框",
+  "pendingCount": "{selected}/{total}",
+  "@pendingCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingAll": "全选",
+  "pendingClear": "全不选",
   "compareHint": "按住查看原图",
   "resetView": "复位视图",
   "exportTitle": "导出",
@@ -97,7 +124,7 @@
   "language": "语言",
   "languageSystem": "跟随系统",
   "privacy": "隐私",
-  "privacyBody": "隐格完全在本机处理图片，没有账号系统，正式版不申请联网权限。",
+  "privacyBody": "隐格完全在本机处理图片，没有账号、没有统计，图片永远不上传。联网权限只用在一处：检查和下载更新。",
   "openSource": "开源",
   "licenses": "开源许可",
   "aboutBody": "一个安静的小工具，专门盖住不该被看见的东西。",
@@ -117,25 +144,79 @@
   },
   "languageEnglish": "English",
   "languageChinese": "简体中文",
-  "apply": "应用",
+  "apply": "落地",
   "clearAll": "全部清除",
   "clearAllConfirm": "要移除这张图上的所有打码吗？",
   "maskStyle": "样式",
   "brushSize": "笔刷大小",
   "blurNote": "模糊强度会随图片尺寸缩放，导出与预览一致。",
   "exifStripped": "已清除 EXIF",
-  "footerNote": "MIT · 无网络 · 无账号",
+  "footerNote": "MIT · 无联网 · 无账号",
   "leaveTitle": "还没导出，确定离开？",
   "leaveBody": "这次的打码不会保存。想留下结果的话，请先导出图片。",
   "leave": "离开",
-  "toolRoundedRect": "圆角框",
-  "roundedRectHint": "拖动框出一块圆角区域",
   "cornerRadius": "圆角",
-  "customColor": "自定义颜色",
+  "customColor": "颜色",
   "selectionHint": "拖动移动 · 四角缩放",
+  "selectionHintMulti": "已选 {count} 处 · 四角只缩放你碰到的那个",
+  "@selectionHintMulti": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "moreActions": "更多",
   "checkUpdate": "检查更新",
-  "checkUpdateNote": "在浏览器中打开版本发布页",
+  "checkUpdateNote": "在应用内下载并安装",
+  "updateChecking": "正在检查更新…",
+  "updateLatest": "已是最新版本（{version}）。",
+  "@updateLatest": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateAvailable": "发现新版本 {version}",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownload": "下载并安装",
+  "updateLater": "稍后",
+  "updateDownloading": "正在下载… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateInstallHint": "Android 会先让你允许「隐格」安装应用，然后弹出系统安装界面。正在编辑的内容不受影响。",
+  "updateDownloaded": "已下载到 {path}",
+  "@updateDownloaded": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "updateShowFile": "打开所在文件夹",
+  "updateFailedCheck": "所有更新源都连不上",
+  "updateFailedDownload": "下载失败",
+  "updateOpenReleases": "打开发布页",
+  "updateSource": "来源 {host}",
+  "@updateSource": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
   "repository": "仓库地址",
   "featureExportTitle": "按原图导出",
   "featureExportBody": "马赛克与模糊按原始像素重绘，不是把小图放大。"

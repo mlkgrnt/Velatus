@@ -69,7 +69,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureLocalBody =>
-      'No upload, no account, no tracking. The app has no network permission.';
+      'No upload, no account, no tracking. The only network use is checking for updates, and you can switch that off.';
 
   @override
   String get featureLayersTitle => 'Masks you can revise';
@@ -79,11 +79,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap a block to select it, then resize it or delete it. Nothing is baked in.';
 
   @override
-  String get featureOcrTitle => 'Finds text offline';
+  String get featureOcrTitle => 'Finds what to cover';
 
   @override
   String get featureOcrBody =>
-      'Detect sensitive text and cover it in one tap. Everything runs on-device.';
+      'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply — all on-device.';
 
   @override
   String get recent => 'Recent';
@@ -116,7 +116,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolBrush => 'Brush';
 
   @override
-  String get toolRect => 'Rectangle';
+  String get toolBox => 'Box';
 
   @override
   String get toolSelect => 'Select';
@@ -143,7 +143,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get brushHint => 'Paint over anything private';
 
   @override
-  String get rectHint => 'Drag to draw a box';
+  String get boxHint => 'Drag to frame an area · corners soften it';
 
   @override
   String get selectHint => 'Tap a mask to adjust or delete it';
@@ -164,34 +164,60 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get ocrAction => 'Find text';
+  String get scanAction => 'Scan';
 
   @override
-  String get ocrScanning => 'Reading text…';
-
-  @override
-  String ocrFound(int count) {
+  String scanFoundText(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count text blocks found',
-      one: '1 text block found',
+      other: '$count text blocks',
+      one: '1 text block',
     );
     return '$_temp0';
   }
 
   @override
-  String get ocrNone => 'No text found';
+  String scanFoundAvatar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avatars',
+      one: '1 avatar',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get ocrApplyAll => 'Cover all';
+  String scanFoundQr(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count QR codes',
+      one: '1 QR code',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get ocrUnavailable =>
-      'Text detection is available on Android only for now.';
+  String get scanNone => 'Nothing worth covering was found';
 
   @override
-  String get ocrFailed => 'Text detection failed';
+  String get scanFailed => 'Scan failed';
+
+  @override
+  String get pendingHint => 'Tap the boxes you want to cover';
+
+  @override
+  String pendingCount(int selected, int total) {
+    return '$selected/$total';
+  }
+
+  @override
+  String get pendingAll => 'Select all';
+
+  @override
+  String get pendingClear => 'Select none';
 
   @override
   String get compareHint => 'Hold to see the original';
@@ -264,7 +290,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyBody =>
-      'Velatus processes everything on your device. There is no account system and the release build requests no network permission.';
+      'Velatus processes everything on your device. There is no account, no telemetry and no image ever leaves the phone. The app has network access for one purpose only: checking for and downloading updates.';
 
   @override
   String get openSource => 'Open source';
@@ -319,7 +345,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exifStripped => 'EXIF stripped';
 
   @override
-  String get footerNote => 'MIT · no network · no account';
+  String get footerNote => 'MIT · offline · no account';
 
   @override
   String get leaveTitle => 'Leave without exporting?';
@@ -332,19 +358,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leave => 'Leave';
 
   @override
-  String get toolRoundedRect => 'Rounded box';
-
-  @override
-  String get roundedRectHint => 'Drag a frame with soft corners';
-
-  @override
   String get cornerRadius => 'Corner radius';
 
   @override
-  String get customColor => 'Custom colour';
+  String get customColor => 'Colour';
 
   @override
-  String get selectionHint => 'Drag to move · corners to resize';
+  String get selectionHint => 'Drag to move · corners resize';
+
+  @override
+  String selectionHintMulti(int count) {
+    return '$count masks selected · corners resize only the one you grab';
+  }
 
   @override
   String get moreActions => 'More';
@@ -353,7 +378,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkUpdate => 'Check for updates';
 
   @override
-  String get checkUpdateNote => 'Opens the releases page in your browser';
+  String get checkUpdateNote => 'Downloads and installs inside the app';
+
+  @override
+  String get updateChecking => 'Checking for updates…';
+
+  @override
+  String updateLatest(String version) {
+    return 'You are on the latest version ($version).';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String get updateDownload => 'Download and install';
+
+  @override
+  String get updateLater => 'Later';
+
+  @override
+  String updateDownloading(int percent) {
+    return 'Downloading… $percent%';
+  }
+
+  @override
+  String get updateInstallHint =>
+      'Android will ask you to allow installs from Velatus, then show its own install screen. Your edits are not affected.';
+
+  @override
+  String updateDownloaded(String path) {
+    return 'Saved to $path';
+  }
+
+  @override
+  String get updateShowFile => 'Show file';
+
+  @override
+  String get updateFailedCheck => 'No update source could be reached';
+
+  @override
+  String get updateFailedDownload => 'The download failed';
+
+  @override
+  String get updateOpenReleases => 'Open the release page';
+
+  @override
+  String updateSource(String host) {
+    return 'via $host';
+  }
 
   @override
   String get repository => 'Source code';

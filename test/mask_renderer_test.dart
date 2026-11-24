@@ -85,7 +85,7 @@ void main() {
       MaskRegion(
         id: 'solid',
         style: MaskStyle.solid,
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: [Offset(0.2, 0.2), Offset(0.4, 0.4)],
         color: Color(0xFFB3261E),
       ),
@@ -125,14 +125,14 @@ void main() {
       MaskRegion(
         id: 'mosaic',
         style: MaskStyle.mosaic,
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: [Offset(0.05, 0.05), Offset(0.35, 0.2)],
         strength: 0.8,
       ),
       MaskRegion(
         id: 'blur',
         style: MaskStyle.blur,
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: [Offset(0.05, 0.3), Offset(0.35, 0.45)],
         strength: 0.8,
       ),
@@ -233,7 +233,7 @@ void main() {
       MaskRegion(
         id: 'hidden',
         style: MaskStyle.solid,
-        shape: MaskShape.rect,
+        shape: MaskShape.box,
         points: [Offset(0.2, 0.2), Offset(0.8, 0.8)],
         visible: false,
       ),

@@ -67,7 +67,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get featureLocalTitle => '全程不出本机';
 
   @override
-  String get featureLocalBody => '不上传、不登录、不统计。应用没有联网权限。';
+  String get featureLocalBody => '不上传、不登录、不统计。唯一的联网用途是检查更新，而且可以关掉。';
 
   @override
   String get featureLayersTitle => '打码可以反悔';
@@ -76,10 +76,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get featureLayersBody => '点一下就能选中某处遮挡，随时改大小或删掉，画上去的都能反悔。';
 
   @override
-  String get featureOcrTitle => '离线找文字';
+  String get featureOcrTitle => '自动找出该遮的地方';
 
   @override
-  String get featureOcrBody => '自动识别敏感文字，一键盖住，全部在本机完成。';
+  String get featureOcrBody => '文字、聊天头像、二维码都会先框出来，你自己挑要盖哪些，全部在本机完成。';
 
   @override
   String get recent => '最近打开';
@@ -112,7 +112,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolBrush => '涂抹';
 
   @override
-  String get toolRect => '矩形';
+  String get toolBox => '框';
 
   @override
   String get toolSelect => '选择';
@@ -139,7 +139,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get brushHint => '在需要遮住的区域上涂抹';
 
   @override
-  String get rectHint => '拖动框选一个区域';
+  String get boxHint => '拖动框选区域 · 圆角条可软化四角';
 
   @override
   String get selectHint => '点选一处打码来调整或删除';
@@ -159,27 +159,42 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get ocrAction => '识别文字';
+  String get scanAction => '扫描';
 
   @override
-  String get ocrScanning => '正在识别文字…';
-
-  @override
-  String ocrFound(int count) {
-    return '发现 $count 处文字';
+  String scanFoundText(int count) {
+    return '$count 处文字';
   }
 
   @override
-  String get ocrNone => '没有找到文字';
+  String scanFoundAvatar(int count) {
+    return '$count 个头像';
+  }
 
   @override
-  String get ocrApplyAll => '全部盖住';
+  String scanFoundQr(int count) {
+    return '$count 个二维码';
+  }
 
   @override
-  String get ocrUnavailable => '文字识别目前仅在 Android 版提供。';
+  String get scanNone => '没有找到需要遮挡的内容';
 
   @override
-  String get ocrFailed => '文字识别失败';
+  String get scanFailed => '扫描失败';
+
+  @override
+  String get pendingHint => '点选要盖住的框';
+
+  @override
+  String pendingCount(int selected, int total) {
+    return '$selected/$total';
+  }
+
+  @override
+  String get pendingAll => '全选';
+
+  @override
+  String get pendingClear => '全不选';
 
   @override
   String get compareHint => '按住查看原图';
@@ -250,7 +265,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacy => '隐私';
 
   @override
-  String get privacyBody => '隐格完全在本机处理图片，没有账号系统，正式版不申请联网权限。';
+  String get privacyBody => '隐格完全在本机处理图片，没有账号、没有统计，图片永远不上传。联网权限只用在一处：检查和下载更新。';
 
   @override
   String get openSource => '开源';
@@ -282,7 +297,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageChinese => '简体中文';
 
   @override
-  String get apply => '应用';
+  String get apply => '落地';
 
   @override
   String get clearAll => '全部清除';
@@ -303,7 +318,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exifStripped => '已清除 EXIF';
 
   @override
-  String get footerNote => 'MIT · 无网络 · 无账号';
+  String get footerNote => 'MIT · 无联网 · 无账号';
 
   @override
   String get leaveTitle => '还没导出，确定离开？';
@@ -315,19 +330,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get leave => '离开';
 
   @override
-  String get toolRoundedRect => '圆角框';
-
-  @override
-  String get roundedRectHint => '拖动框出一块圆角区域';
-
-  @override
   String get cornerRadius => '圆角';
 
   @override
-  String get customColor => '自定义颜色';
+  String get customColor => '颜色';
 
   @override
   String get selectionHint => '拖动移动 · 四角缩放';
+
+  @override
+  String selectionHintMulti(int count) {
+    return '已选 $count 处 · 四角只缩放你碰到的那个';
+  }
 
   @override
   String get moreActions => '更多';
@@ -336,7 +350,57 @@ class AppLocalizationsZh extends AppLocalizations {
   String get checkUpdate => '检查更新';
 
   @override
-  String get checkUpdateNote => '在浏览器中打开版本发布页';
+  String get checkUpdateNote => '在应用内下载并安装';
+
+  @override
+  String get updateChecking => '正在检查更新…';
+
+  @override
+  String updateLatest(String version) {
+    return '已是最新版本（$version）。';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return '发现新版本 $version';
+  }
+
+  @override
+  String get updateDownload => '下载并安装';
+
+  @override
+  String get updateLater => '稍后';
+
+  @override
+  String updateDownloading(int percent) {
+    return '正在下载… $percent%';
+  }
+
+  @override
+  String get updateInstallHint =>
+      'Android 会先让你允许「隐格」安装应用，然后弹出系统安装界面。正在编辑的内容不受影响。';
+
+  @override
+  String updateDownloaded(String path) {
+    return '已下载到 $path';
+  }
+
+  @override
+  String get updateShowFile => '打开所在文件夹';
+
+  @override
+  String get updateFailedCheck => '所有更新源都连不上';
+
+  @override
+  String get updateFailedDownload => '下载失败';
+
+  @override
+  String get updateOpenReleases => '打开发布页';
+
+  @override
+  String updateSource(String host) {
+    return '来源 $host';
+  }
 
   @override
   String get repository => '仓库地址';

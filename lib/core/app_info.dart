@@ -5,15 +5,16 @@ import 'package:url_launcher/url_launcher.dart';
 /// It is duplicated in `pubspec.yaml`; the CI workflow is the only thing that
 /// reads both, so a mismatch shows up as a stale label rather than a build
 /// failure. Keep them in sync when releasing.
-const String kAppVersion = '0.2.0';
+const String kAppVersion = '0.3.0';
 
 const String kRepoUrl = 'https://github.com/mlkgrnt/Velatus';
 const String kReleasesUrl = '$kRepoUrl/releases/latest';
 
 /// Outbound links.
 ///
-/// Velatus has no network permission of its own, so "check for updates" hands
-/// the URL to the system browser instead of polling GitHub from inside the app.
+/// Checking for updates happens inside the app (see `UpdateService`); the
+/// browser is only used for the source link and as a fallback when every update
+/// endpoint is unreachable.
 class AppLinks {
   const AppLinks._();
 

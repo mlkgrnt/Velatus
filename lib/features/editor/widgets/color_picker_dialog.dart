@@ -2,11 +2,28 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/app_localizations.dart';
 
-/// A compact HSV picker.
+/// The colours worth one tap.
 ///
-/// The palette in the tool dock covers the common cases; this exists for the
-/// ones it does not (brand colours, a specific PDF beige, whatever a screenshot
-/// happens to sit on).
+/// These used to live in the tool dock as eight inline swatches, which cost a
+/// whole row of vertical space and still scrolled sideways on a phone. Inside
+/// the dialog there is room for all of them at once, next to the custom picker.
+const List<Color> kSolidPresets = <Color>[
+  Color(0xFF14161C),
+  Color(0xFFFFFFFF),
+  Color(0xFFF2F3F5),
+  Color(0xFF3D4A63),
+  Color(0xFF6B7280),
+  Color(0xFFB3261E),
+  Color(0xFF1B5E20),
+  Color(0xFF4A63D8),
+  Color(0xFFE0A106),
+  Color(0xFF7B1FA2),
+];
+
+/// A compact palette: presets first, HSV for everything else.
+///
+/// Picking a preset closes the dialog immediately — that is the common case and
+/// it should not cost two taps.
 Future<Color?> showColorPickerDialog(
   BuildContext context, {
   required Color initial,
@@ -45,8 +62,22 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final preset in kSolidPresets)
+                  _PresetDot(
+                    color: preset,
+                    selected:
+                        preset.toARGB32() == widget.initial.toARGB32(),
+                    onTap: () => Navigator.of(context).pop(preset),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
             SizedBox(
-              height: 148,
+              height: 132,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: _Pad(
@@ -109,6 +140,53 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   static String _hex(Color color) {
     final value = color.toARGB32() & 0xFFFFFF;
     return '#${value.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+}
+
+class _PresetDot extends StatelessWidget {
+  const _PresetDot({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.9),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
