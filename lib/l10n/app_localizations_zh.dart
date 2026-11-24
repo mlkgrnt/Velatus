@@ -73,7 +73,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get featureLayersTitle => '打码可以反悔';
 
   @override
-  String get featureLayersBody => '每一处遮挡都是独立对象，随时能改回来。';
+  String get featureLayersBody => '点一下就能选中某处遮挡，随时改大小或删掉，画上去的都能反悔。';
 
   @override
   String get featureOcrTitle => '离线找文字';
@@ -106,9 +106,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get export => '导出';
 
   @override
-  String get layers => '打码层';
-
-  @override
   String get fitToScreen => '适应窗口';
 
   @override
@@ -116,12 +113,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolRect => '矩形';
-
-  @override
-  String get toolEllipse => '椭圆';
-
-  @override
-  String get toolLasso => '套索';
 
   @override
   String get toolSelect => '选择';
@@ -151,12 +142,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get rectHint => '拖动框选一个区域';
 
   @override
-  String get ellipseHint => '拖动画一个椭圆';
-
-  @override
-  String get lassoHint => '沿着区域边缘圈选';
-
-  @override
   String get selectHint => '点选一处打码来调整或删除';
 
   @override
@@ -172,12 +157,6 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get emptyLayers => '还没有遮挡';
-
-  @override
-  String get emptyLayersBody => '选一个工具，在图片上拖动即可。';
 
   @override
   String get ocrAction => '识别文字';
@@ -303,15 +282,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageChinese => '简体中文';
 
   @override
-  String get layersHint => '新打码在最上层';
-
-  @override
-  String get tapToEdit => '点击编辑';
-
-  @override
-  String get selected => '已选中';
-
-  @override
   String get apply => '应用';
 
   @override
@@ -333,12 +303,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exifStripped => '已清除 EXIF';
 
   @override
-  String get hide => '隐藏';
-
-  @override
-  String get show => '显示';
-
-  @override
   String get footerNote => 'MIT · 无网络 · 无账号';
 
   @override
@@ -349,4 +313,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leave => '离开';
+
+  @override
+  String get toolRoundedRect => '圆角框';
+
+  @override
+  String get roundedRectHint => '拖动框出一块圆角区域';
+
+  @override
+  String get cornerRadius => '圆角';
+
+  @override
+  String get customColor => '自定义颜色';
+
+  @override
+  String get selectionHint => '拖动移动 · 四角缩放';
+
+  @override
+  String get moreActions => '更多';
+
+  @override
+  String get checkUpdate => '检查更新';
+
+  @override
+  String get checkUpdateNote => '在浏览器中打开版本发布页';
+
+  @override
+  String get repository => '仓库地址';
+
+  @override
+  String get featureExportTitle => '按原图导出';
+
+  @override
+  String get featureExportBody => '马赛克与模糊按原始像素重绘，不是把小图放大。';
 }

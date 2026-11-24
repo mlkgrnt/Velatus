@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../app.dart';
+import '../../core/app_info.dart';
 import '../../core/settings_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/image_loader.dart';
@@ -612,13 +613,13 @@ class _MiniEditor extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Icon(
-                            Icons.crop_square_rounded,
+                            Icons.crop_square,
                             size: 11,
                             color: Colors.white.withValues(alpha: 0.28),
                           ),
                           const SizedBox(width: 8),
                           Icon(
-                            Icons.circle_outlined,
+                            Icons.crop_square_rounded,
                             size: 11,
                             color: Colors.white.withValues(alpha: 0.28),
                           ),
@@ -633,7 +634,7 @@ class _MiniEditor extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              for (var i = 0; i < 5; i++)
+              for (var i = 0; i < 4; i++)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Container(
@@ -648,9 +649,8 @@ class _MiniEditor extends StatelessWidget {
                     child: Icon(
                       const [
                         Icons.brush_outlined,
+                        Icons.crop_square,
                         Icons.crop_square_rounded,
-                        Icons.circle_outlined,
-                        Icons.gesture_rounded,
                         Icons.touch_app_outlined,
                       ][i],
                       size: 12,
@@ -750,6 +750,8 @@ class _MiniBubble extends StatelessWidget {
   }
 }
 
+typedef _Feature = ({IconData icon, String title, String body});
+
 class _FeatureGrid extends StatelessWidget {
   const _FeatureGrid({required this.isWide});
 
@@ -758,18 +760,18 @@ class _FeatureGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final cards = [
-      _FeatureCard(
-        icon: Icons.shield_outlined,
-        title: l10n.featureLocalTitle,
-        body: l10n.featureLocalBody,
+    final features = <_Feature>[
+      (
+        icon: Icons.high_quality_outlined,
+        title: l10n.featureExportTitle,
+        body: l10n.featureExportBody,
       ),
-      _FeatureCard(
-        icon: Icons.layers_outlined,
+      (
+        icon: Icons.undo_rounded,
         title: l10n.featureLayersTitle,
         body: l10n.featureLayersBody,
       ),
-      _FeatureCard(
+      (
         icon: Icons.text_fields_rounded,
         title: l10n.featureOcrTitle,
         body: l10n.featureOcrBody,
@@ -780,34 +782,93 @@ class _FeatureGrid extends StatelessWidget {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < cards.length; i++) ...[
+          for (var i = 0; i < features.length; i++) ...[
             if (i > 0) const SizedBox(width: 16),
-            Expanded(child: cards[i]),
+            Expanded(child: _FeatureCard(feature: features[i])),
           ],
         ],
       );
     }
-    return Column(
-      children: [
-        for (var i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
-          cards[i],
+    // Three stacked cards wasted most of a phone screen on padding and gaps.
+    // One card with hairline dividers fits the same information in a third of
+    // the height and reads as a list instead of three competing boxes.
+    return _FeatureList(features: features);
+  }
+}
+
+class _FeatureList extends StatelessWidget {
+  const _FeatureList({required this.features});
+
+  final List<_Feature> features;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < features.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                indent: 46,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      features[i].icon,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          features[i].title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          features[i].body,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
 
 class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
+  const _FeatureCard({required this.feature});
 
-  final IconData icon;
-  final String title;
-  final String body;
+  final _Feature feature;
 
   @override
   Widget build(BuildContext context) {
@@ -824,18 +885,18 @@ class _FeatureCard extends StatelessWidget {
               color: theme.colorScheme.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 21, color: theme.colorScheme.primary),
+            child: Icon(feature.icon, size: 21, color: theme.colorScheme.primary),
           ),
           const SizedBox(height: 16),
           Text(
-            title,
+            feature.title,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 7),
           Text(
-            body,
+            feature.body,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               height: 1.55,
@@ -944,7 +1005,7 @@ class _Footer extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Velatus 0.1.0',
+          'Velatus $kAppVersion',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

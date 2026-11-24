@@ -10,7 +10,6 @@ import '../../services/ocr_service.dart';
 import 'editor_controller.dart';
 import 'widgets/editor_canvas.dart';
 import 'widgets/export_sheet.dart';
-import 'widgets/layer_panel.dart';
 import 'widgets/tool_dock.dart';
 
 class EditorPage extends StatefulWidget {
@@ -86,6 +85,28 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
+  Future<void> _clearAll() async {
+    if (!_controller.hasMasks) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.clearAll),
+        content: Text(l10n.clearAllConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.clearAll),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) _controller.clearAll();
+  }
+
   Future<void> _export() async {
     if (_controller.busy) return;
     final selection = await showExportSheet(
@@ -155,20 +176,6 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
-  Future<void> _showLayers() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.62,
-        child: ListenableBuilder(
-          listenable: _controller,
-          builder: (context, _) => LayerPanel(controller: _controller),
-        ),
-      ),
-    );
-  }
-
   Future<void> _confirmLeave() async {
     if (_allowPop) return;
     if (!_controller.hasMasks) {
@@ -205,7 +212,7 @@ class _EditorPageState extends State<EditorPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = MediaQuery.sizeOf(context).width >= 760;
 
     return ListenableBuilder(
       listenable: _controller,
@@ -228,8 +235,10 @@ class _EditorPageState extends State<EditorPage> {
                   _controller.redo,
               const SingleActivator(LogicalKeyboardKey.keyS, control: true):
                   _export,
+              const SingleActivator(LogicalKeyboardKey.delete):
+                  _controller.deleteSelected,
               const SingleActivator(LogicalKeyboardKey.escape): () {
-                if (_controller.selectedId != null) {
+                if (_controller.hasSelection) {
                   _controller.clearSelection();
                 } else {
                   _confirmLeave();
@@ -269,12 +278,26 @@ class _EditorPageState extends State<EditorPage> {
                   ),
                   actions: [
                     _CompareButton(controller: _controller),
-                    if (!wide)
-                      IconButton(
-                        onPressed: _showLayers,
-                        icon: const Icon(Icons.layers_outlined),
-                        tooltip: l10n.layers,
-                      ),
+                    PopupMenuButton<String>(
+                      tooltip: l10n.moreActions,
+                      icon: const Icon(Icons.more_vert_rounded),
+                      onSelected: (value) {
+                        if (value == 'clear') _clearAll();
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'clear',
+                          enabled: _controller.hasMasks,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.layers_clear_rounded, size: 20),
+                              const SizedBox(width: 12),
+                              Text(l10n.clearAll),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(0, 8, 10, 8),
                       child: wide
@@ -291,53 +314,47 @@ class _EditorPageState extends State<EditorPage> {
                     ),
                   ],
                 ),
-                body: Row(
+                body: Column(
                   children: [
                     Expanded(
-                      child: Column(
+                      child: Stack(
                         children: [
-                          Expanded(
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: EditorCanvas(
-                                    controller: _controller,
-                                    padding: EdgeInsets.fromLTRB(
-                                      wide ? 32 : 12,
-                                      12,
-                                      wide ? 32 : 12,
-                                      12,
-                                    ),
-                                  ),
-                                ),
-                                if (!_controller.hasMasks &&
-                                    _controller.draft == null &&
-                                    !_controller.busy)
-                                  Positioned(
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 18,
-                                    child: IgnorePointer(
-                                      child: Center(
-                                        child: _ToolHint(
-                                          tool: _controller.tool,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                          Positioned.fill(
+                            child: EditorCanvas(
+                              controller: _controller,
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                12,
+                                16,
+                                12,
+                              ),
                             ),
                           ),
-                          ToolDock(
-                            controller: _controller,
-                            onOcr: OcrService.isSupported ? _runOcr : null,
-                            ocrBusy: _ocrRunning,
-                          ),
+                          if (_controller.draft == null &&
+                              !_controller.busy &&
+                              (_controller.hasSelection ||
+                                  !_controller.hasMasks))
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 14,
+                              child: IgnorePointer(
+                                child: Center(
+                                  child: _ToolHint(
+                                    tool: _controller.tool,
+                                    selected: _controller.hasSelection,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    if (wide)
-                      LayerPanel(controller: _controller, embedded: true),
+                    ToolDock(
+                      controller: _controller,
+                      onOcr: OcrService.isSupported ? _runOcr : null,
+                      ocrBusy: _ocrRunning,
+                    ),
                   ],
                 ),
               ),
@@ -357,46 +374,52 @@ class _CompareButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Listener(
-      onPointerDown: (_) => controller.setShowOriginal(true),
-      onPointerUp: (_) => controller.setShowOriginal(false),
-      onPointerCancel: (_) => controller.setShowOriginal(false),
-      child: IconButton(
-        onPressed: () {},
-        icon: Icon(
-          controller.showOriginal
-              ? Icons.visibility_rounded
-              : Icons.visibility_outlined,
+    return Tooltip(
+      message: l10n.compareHint,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => controller.setShowOriginal(true),
+        onTapUp: (_) => controller.setShowOriginal(false),
+        onTapCancel: () => controller.setShowOriginal(false),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(
+            controller.showOriginal
+                ? Icons.visibility_rounded
+                : Icons.visibility_outlined,
+          ),
         ),
-        tooltip: l10n.compare,
       ),
     );
   }
 }
 
 class _ToolHint extends StatelessWidget {
-  const _ToolHint({required this.tool});
+  const _ToolHint({required this.tool, required this.selected});
 
   final EditorTool tool;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final text = switch (tool) {
-      EditorTool.brush => l10n.brushHint,
-      EditorTool.rect => l10n.rectHint,
-      EditorTool.ellipse => l10n.ellipseHint,
-      EditorTool.lasso => l10n.lassoHint,
-      EditorTool.select => l10n.selectHint,
-    };
+    final text = selected
+        ? l10n.selectionHint
+        : switch (tool) {
+            EditorTool.brush => l10n.brushHint,
+            EditorTool.rect => l10n.rectHint,
+            EditorTool.roundedRect => l10n.roundedRectHint,
+            EditorTool.select => l10n.selectHint,
+          };
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: Container(
-        key: ValueKey(tool),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        key: ValueKey('$tool-$selected'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: theme.colorScheme.inverseSurface.withValues(alpha: 0.88),
+          color: theme.colorScheme.inverseSurface.withValues(alpha: 0.86),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(

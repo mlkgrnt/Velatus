@@ -9,7 +9,7 @@ import 'package:image/image.dart' as img;
 import '../domain/mask_region.dart';
 import 'image_loader.dart';
 import 'mask_renderer.dart';
-import 'mosaic_texture_cache.dart';
+import 'mask_texture_cache.dart';
 
 enum ExportFormat { jpeg, png }
 
@@ -46,7 +46,7 @@ class ImageExporter {
     int quality = 92,
   }) async {
     final full = await ImageLoader.decodeFull(source);
-    final cache = MosaicTextureCache()..attach(full);
+    final cache = MaskTextureCache()..attach(full);
     final rect = Rect.fromLTWH(
       0,
       0,
@@ -55,13 +55,26 @@ class ImageExporter {
     );
 
     try {
+      // Build every texture the masks need before the picture is recorded:
+      // `toImage` is asynchronous, so a lazily requested texture would miss the
+      // export frame and silently bake the original pixels into the file.
       for (final region in regions) {
-        if (region.style != MaskStyle.mosaic || !region.visible) continue;
-        final block = MaskRenderer.mosaicBlockPx(
-          region.strength,
-          rect.shortestSide,
-        );
-        await cache.ensure(block);
+        if (!region.visible) continue;
+        switch (region.style) {
+          case MaskStyle.mosaic:
+            await cache.ensureMosaic(
+              MaskRenderer.mosaicBlockPx(region.strength, rect.shortestSide),
+            );
+          case MaskStyle.blur:
+            await cache.ensureBlur(
+              MaskRenderer.blurSigmaPx(
+                region.strength,
+                rect.shortestSide,
+              ).round(),
+            );
+          case MaskStyle.solid:
+            break;
+        }
       }
 
       final recorder = ui.PictureRecorder();
@@ -74,7 +87,7 @@ class ImageExporter {
         rect,
         full,
         regions,
-        texture: (block) => cache[block],
+        textures: MaskTextures(mosaic: cache.mosaic, blur: cache.blur),
       );
       canvas.restore();
       final picture = recorder.endRecording();

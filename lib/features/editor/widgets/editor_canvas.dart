@@ -7,6 +7,9 @@ import '../../../core/theme.dart';
 import '../../../services/mask_renderer.dart';
 import '../editor_controller.dart';
 
+/// What the current pointer gesture is doing.
+enum _Gesture { none, draw, move, resize, zoom }
+
 class EditorCanvas extends StatefulWidget {
   const EditorCanvas({
     super.key,
@@ -24,11 +27,13 @@ class EditorCanvas extends StatefulWidget {
 class _EditorCanvasState extends State<EditorCanvas> {
   double _scale = 1;
   Offset _offset = Offset.zero;
-  Size _canvasSize = Size.zero;
+  Size? _canvasSize;
 
-  bool _drawing = false;
-  bool _selecting = false;
-  bool _transforming = false;
+  _Gesture _gesture = _Gesture.none;
+  Offset _downPoint = Offset.zero;
+  Offset _lastNorm = Offset.zero;
+  bool _moved = false;
+  int _corner = -1;
 
   double _startScale = 1;
   double _gestureBaseScale = 1;
@@ -38,6 +43,8 @@ class _EditorCanvasState extends State<EditorCanvas> {
   Offset _panOrigin = Offset.zero;
 
   EditorController get c => widget.controller;
+
+  // ------------------------------------------------------------------ mapping
 
   Rect _fitRect(Size canvas) {
     final image = c.image;
@@ -68,23 +75,68 @@ class _EditorCanvasState extends State<EditorCanvas> {
     );
   }
 
+  /// Clamped normalization, used for painting coordinates.
   Offset _normalize(Offset local, Rect rect) {
+    final raw = _rawNormalize(local, rect);
+    return Offset(raw.dx.clamp(0.0, 1.0), raw.dy.clamp(0.0, 1.0));
+  }
+
+  /// Unclamped normalization, used for transforms so a handle can be dragged
+  /// past the opposite corner without the maths collapsing.
+  Offset _rawNormalize(Offset local, Rect rect) {
     return Offset(
-      ((local.dx - rect.left) / rect.width).clamp(0.0, 1.0),
-      ((local.dy - rect.top) / rect.height).clamp(0.0, 1.0),
+      (local.dx - rect.left) / rect.width,
+      (local.dy - rect.top) / rect.height,
     );
   }
 
-  void _startTransform(Offset focal, double gestureScale, Rect rect) {
-    _transforming = true;
-    _drawing = false;
-    _startScale = _scale;
-    _gestureBaseScale = gestureScale;
-    _startNorm = _normalize(focal, rect);
+  /// Screen-space frame around the selected region, or null.
+  Rect? _selectionFrame(Rect imageRect) {
+    final region = c.selectedRegion;
+    if (region == null || region.points.isEmpty) return null;
+    final bounds = region.toPath(imageRect).getBounds();
+    if (bounds.isEmpty && !region.isStroke) return null;
+    final pad = region.isStroke
+        ? region.size * imageRect.shortestSide / 2
+        : 0.0;
+    return bounds.inflate(pad);
   }
 
-  void _updateTransform(ScaleUpdateDetails details, Size canvas) {
-    if (!_transforming) return;
+  /// Index of the corner handle under [local]: 0 tl, 1 tr, 2 bl, 3 br, or -1.
+  int _cornerAt(Rect frame, Offset local) {
+    const reach = 22.0;
+    final corners = [
+      frame.topLeft,
+      frame.topRight,
+      frame.bottomLeft,
+      frame.bottomRight,
+    ];
+    for (var i = 0; i < corners.length; i++) {
+      if ((corners[i] - local).distance <= reach) return i;
+    }
+    return -1;
+  }
+
+  Offset _cornerPoint(Rect rect, int index) {
+    return switch (index) {
+      0 => rect.topLeft,
+      1 => rect.topRight,
+      2 => rect.bottomLeft,
+      _ => rect.bottomRight,
+    };
+  }
+
+  // ---------------------------------------------------------------- transform
+
+  void _startZoom(Offset focal, double gestureScale, Rect rect) {
+    _gesture = _Gesture.zoom;
+    _startScale = _scale;
+    _gestureBaseScale = gestureScale;
+    _startNorm = _rawNormalize(focal, rect);
+  }
+
+  void _updateZoom(ScaleUpdateDetails details, Size canvas) {
+    if (_gesture != _Gesture.zoom) return;
     final base = _fitRect(canvas);
     final relative = _gestureBaseScale == 0
         ? 1.0
@@ -103,7 +155,7 @@ class _EditorCanvasState extends State<EditorCanvas> {
 
   void _zoomAt(double factor, Offset focal, Size canvas) {
     final rect = _displayRect(canvas);
-    final norm = _normalize(focal, rect);
+    final norm = _rawNormalize(focal, rect);
     final newScale = (_scale * factor).clamp(1.0, 12.0);
     if (newScale == _scale) return;
     final base = _fitRect(canvas);
@@ -124,56 +176,123 @@ class _EditorCanvasState extends State<EditorCanvas> {
     });
   }
 
+  // ------------------------------------------------------------------ gestures
+
   void _handleScaleStart(ScaleStartDetails details, Size canvas) {
     final rect = _displayRect(canvas);
+    final local = details.localFocalPoint;
+
     if (details.pointerCount >= 2) {
-      _startTransform(details.localFocalPoint, 1.0, rect);
+      if (_gesture == _Gesture.draw) c.cancelDraft();
+      _startZoom(local, 1.0, rect);
       return;
     }
     if (c.busy) return;
+
+    _downPoint = local;
+    _lastNorm = _rawNormalize(local, rect);
+    _moved = false;
+
     if (c.tool == EditorTool.select) {
-      _selecting = true;
-      c.selectAt(_normalize(details.localFocalPoint, rect));
+      // Only the select tool moves things, so a brush stroke can still be
+      // painted straight across an existing mask.
+      final frame = _selectionFrame(rect);
+      if (frame != null) {
+        final corner = _cornerAt(frame, local);
+        if (corner >= 0) {
+          _gesture = _Gesture.resize;
+          _corner = corner;
+          c.beginScrub();
+          return;
+        }
+        if (c.selectedRegion!.hitTest(_lastNorm, 0.012)) {
+          _gesture = _Gesture.move;
+          c.beginScrub();
+          return;
+        }
+      }
+      c.selectAt(_lastNorm);
       return;
     }
-    if (!rect.inflate(24).contains(details.localFocalPoint)) {
+
+    if (!rect.inflate(24).contains(local)) {
       c.clearSelection();
       return;
     }
-    _drawing = true;
-    c.beginAt(_normalize(details.localFocalPoint, rect));
+    _gesture = _Gesture.draw;
+    c.beginAt(_normalize(local, rect));
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details, Size canvas) {
     final rect = _displayRect(canvas);
-    if (_drawing) {
-      if (details.pointerCount >= 2) {
-        c.cancelDraft();
-        _drawing = false;
-        _startTransform(details.localFocalPoint, details.scale, rect);
-        return;
-      }
-      c.updateAt(_normalize(details.localFocalPoint, rect));
+    final local = details.localFocalPoint;
+
+    if (_gesture == _Gesture.draw && details.pointerCount >= 2) {
+      c.cancelDraft();
+      _startZoom(local, details.scale, rect);
       return;
     }
-    if (_transforming) {
-      _updateTransform(details, canvas);
-      return;
-    }
-    if (_selecting && details.pointerCount == 1) {
-      // Dragging with the select tool simply updates the hit target; masks are
-      // not movable yet, so this stays a tap-like interaction.
-      return;
+    if ((local - _downPoint).distance > 5) _moved = true;
+
+    switch (_gesture) {
+      case _Gesture.draw:
+        _lastNorm = _normalize(local, rect);
+        c.updateAt(_lastNorm);
+      case _Gesture.move:
+        final norm = _rawNormalize(local, rect);
+        c.translateSelected(norm - _lastNorm);
+        _lastNorm = norm;
+      case _Gesture.resize:
+        final region = c.selectedRegion;
+        final frame = _selectionFrame(rect);
+        if (region == null || frame == null) return;
+        final pad = region.isStroke
+            ? region.size * rect.shortestSide / 2
+            : 0.0;
+        final anchorNorm = _rawNormalize(_cornerPoint(frame, switch (_corner) {
+          0 => 3,
+          1 => 2,
+          2 => 1,
+          _ => 0,
+        }), rect);
+        final box = Rect.fromPoints(
+          anchorNorm,
+          _rawNormalize(local, rect),
+        );
+        final padX = rect.width == 0 ? 0.0 : pad / rect.width;
+        final padY = rect.height == 0 ? 0.0 : pad / rect.height;
+        // `resizeSelected` works on the centre-line box, so the visual padding
+        // of a brush stroke is removed again before handing it over.
+        c.resizeSelected(
+          Rect.fromLTRB(
+            box.left + padX,
+            box.top + padY,
+            math.max(box.left + padX + 0.004, box.right - padX),
+            math.max(box.top + padY + 0.004, box.bottom - padY),
+          ),
+        );
+      case _Gesture.zoom:
+        _updateZoom(details, canvas);
+      case _Gesture.none:
+        break;
     }
   }
 
-  void _handleScaleEnd(ScaleEndDetails details) {
-    if (_drawing) {
-      _drawing = false;
-      c.endAt();
+  void _handleScaleEnd() {
+    if (_gesture == _Gesture.draw) {
+      if (!_moved) {
+        // A tap with a drawing tool means "pick this block", not "draw a dot".
+        c.cancelDraft();
+        c.selectAt(_lastNorm);
+      } else {
+        c.endAt();
+      }
     }
-    _transforming = false;
-    _selecting = false;
+    if (_gesture == _Gesture.move || _gesture == _Gesture.resize) {
+      c.endScrub();
+    }
+    _gesture = _Gesture.none;
+    _corner = -1;
   }
 
   @override
@@ -184,19 +303,25 @@ class _EditorCanvasState extends State<EditorCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        if (size != _canvasSize) {
+        if (_canvasSize == null) {
           _canvasSize = size;
-          _scale = 1;
-          _offset = Offset.zero;
+        } else if (size != _canvasSize) {
+          // The dock grows and shrinks as tools change. Keeping the zoom that
+          // the user set is more important than re-fitting the photo, so only
+          // the offset is nudged back into range.
+          _canvasSize = size;
+          final base = _fitRect(size);
+          final maxDx = math.max(0.0, base.width * _scale / 2);
+          final maxDy = math.max(0.0, base.height * _scale / 2);
+          _offset = Offset(
+            _offset.dx.clamp(-maxDx, maxDx),
+            _offset.dy.clamp(-maxDy, maxDy),
+          );
         }
         final rect = _displayRect(size);
 
         return MouseRegion(
-          cursor: c.busy
-              ? SystemMouseCursors.wait
-              : (c.tool == EditorTool.select
-                  ? SystemMouseCursors.click
-                  : SystemMouseCursors.precise),
+          cursor: c.busy ? SystemMouseCursors.wait : SystemMouseCursors.precise,
           child: Listener(
             onPointerSignal: (event) {
               if (event is PointerScrollEvent) {
@@ -223,7 +348,7 @@ class _EditorCanvasState extends State<EditorCanvas> {
               behavior: HitTestBehavior.opaque,
               onScaleStart: (details) => _handleScaleStart(details, size),
               onScaleUpdate: (details) => _handleScaleUpdate(details, size),
-              onScaleEnd: _handleScaleEnd,
+              onScaleEnd: (_) => _handleScaleEnd(),
               onDoubleTap: () {
                 if (_scale > 1.01) {
                   _resetView();
@@ -316,13 +441,12 @@ class _EditorPainter extends CustomPainter {
 
     if (controller.showOriginal) return;
 
-    final regions = controller.regions;
     MaskRenderer.paintRegions(
       canvas,
       imageRect,
       controller.image.preview,
-      regions,
-      texture: controller.textureFor,
+      controller.regions,
+      textures: controller.textures,
     );
 
     final draft = controller.draft;
@@ -332,13 +456,7 @@ class _EditorPainter extends CustomPainter {
         imageRect,
         controller.image.preview,
         draft,
-        texture: controller.textureFor,
-      );
-      MaskRenderer.paintSelection(
-        canvas,
-        imageRect,
-        draft,
-        accent: accent,
+        textures: controller.textures,
       );
     }
 
@@ -354,7 +472,5 @@ class _EditorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _EditorPainter oldDelegate) {
-    return true;
-  }
+  bool shouldRepaint(covariant _EditorPainter oldDelegate) => true;
 }

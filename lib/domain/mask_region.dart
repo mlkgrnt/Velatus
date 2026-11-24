@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,12 @@ import 'package:flutter/foundation.dart';
 enum MaskStyle { mosaic, blur, solid }
 
 /// The geometry used to describe a region.
-enum MaskShape { stroke, rect, ellipse, lasso }
+///
+/// Ellipse and lasso used to live here as well. In practice both were rarely
+/// the right shape for a redaction and they made "select a block and adjust it"
+/// much harder to reason about, so the set is now deliberately small: a free
+/// hand stroke plus two rectangles that differ only in their corners.
+enum MaskShape { stroke, rect, roundedRect }
 
 /// A single, non-destructive redaction object.
 ///
@@ -22,6 +28,7 @@ class MaskRegion {
     required this.points,
     this.size = 0.05,
     this.strength = 0.65,
+    this.radius = 0.24,
     this.color = const Color(0xFF12141A),
     this.visible = true,
   });
@@ -37,6 +44,10 @@ class MaskRegion {
   /// 0..1. Mapped to pixel block size or blur sigma by the renderer.
   final double strength;
 
+  /// Corner radius of a [MaskShape.roundedRect], as a fraction of the shorter
+  /// side of its own bounding box. 0 is a square corner, 0.5 is a stadium.
+  final double radius;
+
   /// Used by [MaskStyle.solid].
   final Color color;
 
@@ -44,12 +55,17 @@ class MaskRegion {
 
   bool get isStroke => shape == MaskShape.stroke;
 
+  /// True for shapes that enclose an area, i.e. everything that is not a
+  /// brush stroke. Only these expose corner handles for resizing.
+  bool get isFill => shape != MaskShape.stroke;
+
   MaskRegion copyWith({
     MaskStyle? style,
     MaskShape? shape,
     List<Offset>? points,
     double? size,
     double? strength,
+    double? radius,
     Color? color,
     bool? visible,
   }) {
@@ -60,6 +76,7 @@ class MaskRegion {
       points: points ?? this.points,
       size: size ?? this.size,
       strength: strength ?? this.strength,
+      radius: radius ?? this.radius,
       color: color ?? this.color,
       visible: visible ?? this.visible,
     );
@@ -68,9 +85,9 @@ class MaskRegion {
   /// Builds the path for this region inside [imageRect].
   Path toPath(Rect imageRect) {
     Offset p(Offset n) => Offset(
-          imageRect.left + n.dx * imageRect.width,
-          imageRect.top + n.dy * imageRect.height,
-        );
+      imageRect.left + n.dx * imageRect.width,
+      imageRect.top + n.dy * imageRect.height,
+    );
 
     final path = Path();
     switch (shape) {
@@ -93,22 +110,25 @@ class MaskRegion {
           return path;
         }
         path.addRect(Rect.fromPoints(p(points.first), p(points.last)));
-      case MaskShape.ellipse:
+      case MaskShape.roundedRect:
         if (points.length < 2) {
           return path;
         }
-        path.addOval(Rect.fromPoints(p(points.first), p(points.last)));
-      case MaskShape.lasso:
-        if (points.length < 3) {
+        final rect = Rect.fromPoints(p(points.first), p(points.last));
+        if (rect.isEmpty) {
           return path;
         }
-        path.addPolygon(points.map(p).toList(growable: false), true);
+        final corner =
+            radius.clamp(0.0, 0.5) * math.min(rect.width, rect.height);
+        path.addRRect(
+          RRect.fromRectAndRadius(rect, Radius.circular(corner)),
+        );
     }
     return path;
   }
 
-  /// Axis-aligned bounds in normalized space, used for hit testing and for
-  /// framing layer thumbnails.
+  /// Axis-aligned bounds in normalized space, used for hit testing, for the
+  /// resize frame and for export-time bookkeeping.
   Rect get normalizedBounds {
     if (points.isEmpty) {
       return Rect.zero;
@@ -122,6 +142,45 @@ class MaskRegion {
       if (pt.dy > maxY) maxY = pt.dy;
     }
     return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+
+  /// Moves the whole region by [delta], in normalized space.
+  MaskRegion translated(Offset delta) {
+    return copyWith(
+      points: [for (final point in points) point + delta],
+    );
+  }
+
+  /// Stretches the region so that its bounding box becomes [target].
+  ///
+  /// This is what the corner handles call. It is uniform across shapes: a brush
+  /// stroke is remapped point by point, which keeps its silhouette instead of
+  /// degrading into a rectangle.
+  MaskRegion scaledTo(Rect target) {
+    final from = normalizedBounds;
+    if (from.width <= 0 || from.height <= 0) {
+      // A single dot or a perfectly straight line: there is no box to map, so
+      // keep the points together and let the caller's bounds guard handle it.
+      final center = target.center;
+      return copyWith(
+        points: List<Offset>.filled(points.length, center),
+      );
+    }
+    final scaleX = target.width / from.width;
+    final scaleY = target.height / from.height;
+    return copyWith(
+      points: [
+        for (final point in points)
+          Offset(
+            target.left + (point.dx - from.left) * scaleX,
+            target.top + (point.dy - from.top) * scaleY,
+          ),
+      ],
+      // A stretched stroke should stay visually proportional to its box.
+      size: isStroke
+          ? (size * math.sqrt(scaleX * scaleY)).clamp(0.004, 0.4)
+          : size,
+    );
   }
 
   /// Hit test in normalized space. [tolerance] is normalized too.
@@ -142,28 +201,16 @@ class MaskRegion {
         }
         return false;
       case MaskShape.rect:
+      case MaskShape.roundedRect:
         if (points.length < 2) {
           return false;
         }
-        return Rect.fromPoints(points.first, points.last)
-            .inflate(tolerance)
-            .contains(point);
-      case MaskShape.ellipse:
-        if (points.length < 2) {
-          return false;
-        }
-        final r = Rect.fromPoints(points.first, points.last).inflate(tolerance);
-        if (r.width <= 0 || r.height <= 0) {
-          return false;
-        }
-        final nx = (point.dx - r.center.dx) / (r.width / 2);
-        final ny = (point.dy - r.center.dy) / (r.height / 2);
-        return nx * nx + ny * ny <= 1;
-      case MaskShape.lasso:
-        if (points.length < 3) {
-          return false;
-        }
-        return toPath(const Rect.fromLTWH(0, 0, 1, 1)).contains(point);
+        // The rounded corners are close enough to square at the tolerance scale
+        // that testing the box keeps taps predictable.
+        return Rect.fromPoints(
+          points.first,
+          points.last,
+        ).inflate(tolerance).contains(point);
     }
   }
 

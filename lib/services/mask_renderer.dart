@@ -1,11 +1,27 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
 
 import '../domain/mask_region.dart';
 
-typedef MosaicTextureLookup = ui.Image? Function(int blockPx);
+/// Resolved offscreen textures for one paint pass.
+///
+/// The renderer never builds them itself; the caller owns the cache so that
+/// preview and export can share the exact same drawing code while using
+/// differently sized sources.
+class MaskTextures {
+  const MaskTextures({this.mosaic, this.blur});
+
+  /// Returns the pixelated copy for a block size, or null while it renders.
+  final ui.Image? Function(int blockPx)? mosaic;
+
+  /// Returns the pre-blurred copy for a sigma, or null while it renders.
+  final ui.Image? Function(int sigmaPx)? blur;
+
+  static const MaskTextures none = MaskTextures();
+}
 
 /// Draws mask effects. The same code path is used for the interactive preview
 /// and for the full-resolution export, which is what keeps "what you see" and
@@ -36,10 +52,10 @@ class MaskRenderer {
     ui.Rect imageRect,
     ui.Image source,
     List<MaskRegion> regions, {
-    MosaicTextureLookup? texture,
+    MaskTextures textures = MaskTextures.none,
   }) {
     for (final region in regions) {
-      paintRegion(canvas, imageRect, source, region, texture: texture);
+      paintRegion(canvas, imageRect, source, region, textures: textures);
     }
   }
 
@@ -48,7 +64,7 @@ class MaskRenderer {
     ui.Rect imageRect,
     ui.Image source,
     MaskRegion region, {
-    MosaicTextureLookup? texture,
+    MaskTextures textures = MaskTextures.none,
   }) {
     if (!region.visible || region.points.isEmpty) return;
     final path = region.toPath(imageRect);
@@ -58,128 +74,81 @@ class MaskRenderer {
     // though there is a stroke to draw. Only fill shapes are truly degenerate.
     if (bounds.isEmpty && !region.isStroke) return;
 
-    // Mosaic block size is derived from the source pixels because the cached
-    // texture is built at source resolution. Blur sigma is derived from the
-    // destination rect because the filter runs in destination space.
+    // Every effect is resolved against the *image*, never against the mask's
+    // own rectangle. That is what allows the strength slider to change how
+    // coarse the mask looks without also changing how much of the photo it
+    // covers.
     final sourceShortSide = math.min(
       source.width.toDouble(),
       source.height.toDouble(),
     );
-    final sigma = region.style == MaskStyle.blur
-        ? blurSigmaPx(region.strength, imageRect.shortestSide)
-        : 0.0;
     final strokeWidth = region.isStroke
         ? region.size * imageRect.shortestSide
         : 0.0;
 
-    if (region.style == MaskStyle.solid) {
-      // A flat colour needs no offscreen buffer: clipping is both exact and
-      // cheap. Blending a solid rect through `dstIn` inside a layer is not
-      // reliable (the whole layer gets flattened to the fill colour), so this
-      // path deliberately avoids `saveLayer`.
-      canvas.save();
-      canvas.clipRect(imageRect);
-      final paint = ui.Paint()
-        ..color = region.color
-        ..isAntiAlias = true;
-      if (region.isStroke) {
-        paint
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = strokeWidth
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round;
-        canvas.drawPath(path, paint);
-      } else {
-        canvas.clipPath(path);
-        canvas.drawRect(imageRect, paint);
-      }
-      canvas.restore();
-      return;
-    }
-
-    // The offscreen layer only needs to cover the mask (plus the blur halo and
-    // the half stroke width), not the whole photo.
-    final pad = math.max(sigma * 2 + 2, strokeWidth / 2 + 2);
-    final layerRect = bounds.inflate(pad).intersect(imageRect);
-    if (layerRect.isEmpty) return;
-
-    canvas.saveLayer(layerRect, ui.Paint());
-    canvas.clipRect(layerRect);
-
+    final paint = ui.Paint()..isAntiAlias = true;
     switch (region.style) {
+      case MaskStyle.solid:
+        paint.color = region.color;
       case MaskStyle.mosaic:
         final block = mosaicBlockPx(region.strength, sourceShortSide);
-        final tex = texture?.call(block);
-        if (tex != null) {
-          canvas.drawImageRect(
-            tex,
-            ui.Rect.fromLTWH(0, 0, tex.width.toDouble(), tex.height.toDouble()),
-            imageRect,
-            ui.Paint()..filterQuality = ui.FilterQuality.none,
-          );
-        } else {
-          // Fallback while the texture is still rendering.
-          canvas.drawImageRect(
-            source,
-            ui.Rect.fromLTWH(
-              0,
-              0,
-              source.width.toDouble(),
-              source.height.toDouble(),
-            ),
-            imageRect,
-            ui.Paint()..filterQuality = ui.FilterQuality.low,
-          );
-        }
+        final texture = textures.mosaic?.call(block);
+        paint.shader = texture != null
+            ? ui.ImageShader(
+                texture,
+                ui.TileMode.clamp,
+                ui.TileMode.clamp,
+                _matrixFor(texture, imageRect),
+                filterQuality: ui.FilterQuality.none,
+              )
+            : _coarseSampler(source, imageRect, block.toDouble());
       case MaskStyle.blur:
-        canvas.drawImageRect(
-          source,
-          ui.Rect.fromLTWH(
-            0,
-            0,
-            source.width.toDouble(),
-            source.height.toDouble(),
-          ),
-          imageRect,
-          ui.Paint()
-            ..filterQuality = ui.FilterQuality.low
-            ..imageFilter = ui.ImageFilter.blur(
-              sigmaX: sigma,
-              sigmaY: sigma,
-              tileMode: ui.TileMode.clamp,
-            ),
-        );
-      case MaskStyle.solid:
-        break;
+        final sigma = blurSigmaPx(region.strength, sourceShortSide);
+        final texture = textures.blur?.call(sigma.round());
+        paint.shader = texture != null
+            ? ui.ImageShader(
+                texture,
+                ui.TileMode.clamp,
+                ui.TileMode.clamp,
+                _matrixFor(texture, imageRect),
+                filterQuality: ui.FilterQuality.medium,
+              )
+            // Until the blurred copy is ready, sample the photo coarsely so a
+            // freshly drawn region never shows the original pixels.
+            : _coarseSampler(source, imageRect, sigma);
     }
 
-    final maskPaint = ui.Paint()
-      ..blendMode = ui.BlendMode.dstIn
-      ..color = const Color(0xFFFFFFFF)
-      ..style = region.isStroke ? PaintingStyle.stroke : PaintingStyle.fill
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..isAntiAlias = true;
-    canvas.drawPath(path, maskPaint);
+    if (region.isStroke) {
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+    }
+
+    canvas.save();
+    canvas.clipRect(imageRect);
+    canvas.drawPath(path, paint);
     canvas.restore();
   }
 
-  /// Outline for the currently selected region.
+  /// Outline, bounding frame and corner handles for the selected region.
   static void paintSelection(
     ui.Canvas canvas,
     ui.Rect imageRect,
     MaskRegion region, {
     required Color accent,
+    bool handles = true,
   }) {
     if (region.points.isEmpty) return;
     final path = region.toPath(imageRect);
-    if (path.getBounds().isEmpty && !region.isStroke) return;
+    final bounds = path.getBounds();
+    if (bounds.isEmpty && !region.isStroke) return;
 
     // A brush stroke is already as wide as the mask itself. Outlining it at
     // that width would paint over the mosaic the user is trying to inspect, so
     // strokes get a thin centreline instead of a fat ring.
-    final baseWidth = region.isStroke ? 1.5 : 2.5;
+    final baseWidth = region.isStroke ? 1.5 : 2.0;
 
     // Halo, so the outline survives on both light and dark photos.
     canvas.drawPath(
@@ -200,6 +169,86 @@ class MaskRenderer {
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..color = accent,
+    );
+
+    if (!handles) return;
+
+    final strokePad = region.isStroke
+        ? region.size * imageRect.shortestSide / 2
+        : 0.0;
+    final frame = bounds.inflate(strokePad);
+    final rrect = RRect.fromRectAndRadius(frame, const Radius.circular(3));
+    canvas.drawRRect(
+      rrect,
+      ui.Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..color = accent.withValues(alpha: 0.85),
+    );
+    canvas.drawRRect(
+      rrect,
+      ui.Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..color = const Color(0x66FFFFFF),
+    );
+    for (final corner in [
+      frame.topLeft,
+      frame.topRight,
+      frame.bottomLeft,
+      frame.bottomRight,
+    ]) {
+      canvas.drawCircle(
+        corner,
+        5.4,
+        ui.Paint()..color = const Color(0xFFFFFFFF),
+      );
+      canvas.drawCircle(
+        corner,
+        5.4,
+        ui.Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..color = accent,
+      );
+    }
+  }
+
+  /// Maps the texture onto [rect] in local canvas coordinates.
+  static Float64List _matrixFor(ui.Image texture, Rect rect) {
+    final scaleX = rect.width / texture.width;
+    final scaleY = rect.height / texture.height;
+    // Column-major, i.e. translate * scale.
+    return Float64List.fromList(<double>[
+      scaleX, 0, 0, 0, //
+      0, scaleY, 0, 0, //
+      0, 0, 1, 0, //
+      rect.left, rect.top, 0, 1,
+    ]);
+  }
+
+  /// Nearest-neighbour sampling of the source at [stride] destination pixels
+  /// per sample. Used only as an instant stand-in while a real texture renders.
+  static ImageShader _coarseSampler(
+    ui.Image source,
+    Rect imageRect,
+    double stride,
+  ) {
+    final step = math.max(1.0, stride);
+    // `ImageShader` maps texture pixels to local coordinates, so a texture
+    // pixel covers `step` destination pixels and nearest sampling quantises
+    // every block to its first source pixel.
+    return ui.ImageShader(
+      source,
+      ui.TileMode.clamp,
+      ui.TileMode.clamp,
+      Float64List.fromList(<double>[
+        imageRect.width * step / source.width, 0, 0, 0, //
+        0, imageRect.height * step / source.height, 0, 0, //
+        0, 0, 1, 0, //
+        imageRect.left, imageRect.top, 0, 1,
+      ]),
+      filterQuality: ui.FilterQuality.none,
     );
   }
 }

@@ -218,7 +218,7 @@ void main() {
             strength: 0.5,
           ),
         ])
-        ..selectRegion('m2');
+        ..selectAt(const Offset(0.45, 0.405));
       await Future<void>.delayed(const Duration(milliseconds: 400));
     });
     addTearDown(controller.dispose);

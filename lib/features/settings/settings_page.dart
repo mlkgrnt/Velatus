@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app.dart';
+import '../../core/app_info.dart';
 import '../../core/settings_controller.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -24,31 +25,28 @@ class SettingsPage extends StatelessWidget {
             children: [
               _SectionLabel(l10n.appearance),
               SoftCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.all(10),
+                child: Row(
                   children: [
-                    SegmentedButton<ThemeMode>(
-                      showSelectedIcon: false,
-                      segments: [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          icon: const Icon(Icons.brightness_auto_outlined, size: 18),
-                          label: Text(l10n.themeSystem),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          icon: const Icon(Icons.light_mode_outlined, size: 18),
-                          label: Text(l10n.themeLight),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          icon: const Icon(Icons.dark_mode_outlined, size: 18),
-                          label: Text(l10n.themeDark),
-                        ),
-                      ],
-                      selected: {settings.themeMode},
-                      onSelectionChanged: (value) =>
-                          settings.setThemeMode(value.first),
+                    _ThemeTile(
+                      icon: Icons.brightness_auto_outlined,
+                      label: l10n.themeSystem,
+                      selected: settings.themeMode == ThemeMode.system,
+                      onTap: () => settings.setThemeMode(ThemeMode.system),
+                    ),
+                    const SizedBox(width: 8),
+                    _ThemeTile(
+                      icon: Icons.light_mode_outlined,
+                      label: l10n.themeLight,
+                      selected: settings.themeMode == ThemeMode.light,
+                      onTap: () => settings.setThemeMode(ThemeMode.light),
+                    ),
+                    const SizedBox(width: 8),
+                    _ThemeTile(
+                      icon: Icons.dark_mode_outlined,
+                      label: l10n.themeDark,
+                      selected: settings.themeMode == ThemeMode.dark,
+                      onTap: () => settings.setThemeMode(ThemeMode.dark),
                     ),
                   ],
                 ),
@@ -60,9 +58,7 @@ class SettingsPage extends StatelessWidget {
                   groupValue: settings.locale?.languageCode ?? 'system',
                   onChanged: (value) {
                     if (value == null) return;
-                    settings.setLocale(
-                      value == 'system' ? null : Locale(value),
-                    );
+                    settings.setLocale(value == 'system' ? null : Locale(value));
                   },
                   child: Column(
                     children: [
@@ -91,8 +87,11 @@ class SettingsPage extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.lock_outline_rounded,
-                        color: theme.colorScheme.primary, size: 22),
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 22,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
@@ -109,7 +108,9 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 24),
               _SectionLabel(l10n.about),
               SoftCard(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
@@ -127,7 +128,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                '0.1.0 · MIT',
+                                '$kAppVersion · MIT',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -137,7 +138,7 @@ class SettingsPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     Text(
                       l10n.aboutBody,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -145,17 +146,60 @@ class SettingsPage extends StatelessWidget {
                         height: 1.6,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () => showLicensePage(
-                          context: context,
-                          applicationName: 'Velatus',
-                          applicationVersion: '0.1.0',
+                    const SizedBox(height: 12),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                    _LinkRow(
+                      icon: Icons.system_update_alt_rounded,
+                      title: l10n.checkUpdate,
+                      subtitle: l10n.checkUpdateNote,
+                      onTap: () async {
+                        final opened = await AppLinks.openReleases();
+                        if (!opened && context.mounted) {
+                          _toast(context, kReleasesUrl);
+                        }
+                      },
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                    _LinkRow(
+                      icon: Icons.code_rounded,
+                      title: l10n.repository,
+                      subtitle: 'github.com/mlkgrnt/Velatus',
+                      onTap: () async {
+                        final opened = await AppLinks.openRepository();
+                        if (!opened && context.mounted) {
+                          _toast(context, kRepoUrl);
+                        }
+                      },
+                    ),
+                    Divider(
+                      height: 1,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => showLicensePage(
+                            context: context,
+                            applicationName: 'Velatus',
+                            applicationVersion: kAppVersion,
+                          ),
+                          icon: const Icon(Icons.article_outlined, size: 18),
+                          label: Text(l10n.licenses),
                         ),
-                        icon: const Icon(Icons.article_outlined, size: 18),
-                        label: Text(l10n.licenses),
                       ),
                     ),
                   ],
@@ -164,6 +208,128 @@ class SettingsPage extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _toast(BuildContext context, String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: SelectableText(text)));
+  }
+}
+
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = selected
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.45,
+                  ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: foreground),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontSize: 12,
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkRow extends StatelessWidget {
+  const _LinkRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.open_in_new_rounded,
+              size: 16,
+              color: theme.colorScheme.outline,
+            ),
+          ],
+        ),
       ),
     );
   }

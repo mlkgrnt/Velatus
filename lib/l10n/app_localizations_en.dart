@@ -76,7 +76,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureLayersBody =>
-      'Every patch stays a separate object, so you can tune or remove it later.';
+      'Tap a block to select it, then resize it or delete it. Nothing is baked in.';
 
   @override
   String get featureOcrTitle => 'Finds text offline';
@@ -110,9 +110,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get export => 'Export';
 
   @override
-  String get layers => 'Masks';
-
-  @override
   String get fitToScreen => 'Fit to screen';
 
   @override
@@ -120,12 +117,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolRect => 'Rectangle';
-
-  @override
-  String get toolEllipse => 'Ellipse';
-
-  @override
-  String get toolLasso => 'Lasso';
 
   @override
   String get toolSelect => 'Select';
@@ -155,12 +146,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rectHint => 'Drag to draw a box';
 
   @override
-  String get ellipseHint => 'Drag to draw an ellipse';
-
-  @override
-  String get lassoHint => 'Draw around the area';
-
-  @override
   String get selectHint => 'Tap a mask to adjust or delete it';
 
   @override
@@ -177,12 +162,6 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get emptyLayers => 'Nothing covered yet';
-
-  @override
-  String get emptyLayersBody => 'Pick a tool and drag on the image.';
 
   @override
   String get ocrAction => 'Find text';
@@ -318,15 +297,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageChinese => '简体中文';
 
   @override
-  String get layersHint => 'Newest on top';
-
-  @override
-  String get tapToEdit => 'Tap to edit';
-
-  @override
-  String get selected => 'Selected';
-
-  @override
   String get apply => 'Apply';
 
   @override
@@ -349,12 +319,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exifStripped => 'EXIF stripped';
 
   @override
-  String get hide => 'Hide';
-
-  @override
-  String get show => 'Show';
-
-  @override
   String get footerNote => 'MIT · no network · no account';
 
   @override
@@ -366,4 +330,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leave => 'Leave';
+
+  @override
+  String get toolRoundedRect => 'Rounded box';
+
+  @override
+  String get roundedRectHint => 'Drag a frame with soft corners';
+
+  @override
+  String get cornerRadius => 'Corner radius';
+
+  @override
+  String get customColor => 'Custom colour';
+
+  @override
+  String get selectionHint => 'Drag to move · corners to resize';
+
+  @override
+  String get moreActions => 'More';
+
+  @override
+  String get checkUpdate => 'Check for updates';
+
+  @override
+  String get checkUpdateNote => 'Opens the releases page in your browser';
+
+  @override
+  String get repository => 'Source code';
+
+  @override
+  String get featureExportTitle => 'Full-resolution output';
+
+  @override
+  String get featureExportBody =>
+      'Masks are redrawn at the source pixel grid, not upscaled from the preview.';
 }

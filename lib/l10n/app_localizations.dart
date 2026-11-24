@@ -227,7 +227,7 @@ abstract class AppLocalizations {
   /// No description provided for @featureLayersBody.
   ///
   /// In en, this message translates to:
-  /// **'Every patch stays a separate object, so you can tune or remove it later.'**
+  /// **'Tap a block to select it, then resize it or delete it. Nothing is baked in.'**
   String get featureLayersBody;
 
   /// No description provided for @featureOcrTitle.
@@ -290,12 +290,6 @@ abstract class AppLocalizations {
   /// **'Export'**
   String get export;
 
-  /// No description provided for @layers.
-  ///
-  /// In en, this message translates to:
-  /// **'Masks'**
-  String get layers;
-
   /// No description provided for @fitToScreen.
   ///
   /// In en, this message translates to:
@@ -313,18 +307,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rectangle'**
   String get toolRect;
-
-  /// No description provided for @toolEllipse.
-  ///
-  /// In en, this message translates to:
-  /// **'Ellipse'**
-  String get toolEllipse;
-
-  /// No description provided for @toolLasso.
-  ///
-  /// In en, this message translates to:
-  /// **'Lasso'**
-  String get toolLasso;
 
   /// No description provided for @toolSelect.
   ///
@@ -380,18 +362,6 @@ abstract class AppLocalizations {
   /// **'Drag to draw a box'**
   String get rectHint;
 
-  /// No description provided for @ellipseHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Drag to draw an ellipse'**
-  String get ellipseHint;
-
-  /// No description provided for @lassoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Draw around the area'**
-  String get lassoHint;
-
   /// No description provided for @selectHint.
   ///
   /// In en, this message translates to:
@@ -409,18 +379,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =0{No masks} =1{1 mask} other{{count} masks}}'**
   String maskCount(int count);
-
-  /// No description provided for @emptyLayers.
-  ///
-  /// In en, this message translates to:
-  /// **'Nothing covered yet'**
-  String get emptyLayers;
-
-  /// No description provided for @emptyLayersBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a tool and drag on the image.'**
-  String get emptyLayersBody;
 
   /// No description provided for @ocrAction.
   ///
@@ -656,24 +614,6 @@ abstract class AppLocalizations {
   /// **'简体中文'**
   String get languageChinese;
 
-  /// No description provided for @layersHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Newest on top'**
-  String get layersHint;
-
-  /// No description provided for @tapToEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to edit'**
-  String get tapToEdit;
-
-  /// No description provided for @selected.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected'**
-  String get selected;
-
   /// No description provided for @apply.
   ///
   /// In en, this message translates to:
@@ -716,18 +656,6 @@ abstract class AppLocalizations {
   /// **'EXIF stripped'**
   String get exifStripped;
 
-  /// No description provided for @hide.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide'**
-  String get hide;
-
-  /// No description provided for @show.
-  ///
-  /// In en, this message translates to:
-  /// **'Show'**
-  String get show;
-
   /// No description provided for @footerNote.
   ///
   /// In en, this message translates to:
@@ -751,6 +679,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leave'**
   String get leave;
+
+  /// No description provided for @toolRoundedRect.
+  ///
+  /// In en, this message translates to:
+  /// **'Rounded box'**
+  String get toolRoundedRect;
+
+  /// No description provided for @roundedRectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag a frame with soft corners'**
+  String get roundedRectHint;
+
+  /// No description provided for @cornerRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Corner radius'**
+  String get cornerRadius;
+
+  /// No description provided for @customColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom colour'**
+  String get customColor;
+
+  /// No description provided for @selectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move · corners to resize'**
+  String get selectionHint;
+
+  /// No description provided for @moreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get moreActions;
+
+  /// No description provided for @checkUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get checkUpdate;
+
+  /// No description provided for @checkUpdateNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the releases page in your browser'**
+  String get checkUpdateNote;
+
+  /// No description provided for @repository.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get repository;
+
+  /// No description provided for @featureExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-resolution output'**
+  String get featureExportTitle;
+
+  /// No description provided for @featureExportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Masks are redrawn at the source pixel grid, not upscaled from the preview.'**
+  String get featureExportBody;
 }
 
 class _AppLocalizationsDelegate
