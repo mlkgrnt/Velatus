@@ -17,8 +17,9 @@ const _imageRect = Rect.fromLTWH(0, 0, 200, 200);
 /// interactive preview and the full-resolution export share.
 Future<ByteData> _render(
   WidgetTester tester,
-  List<MaskRegion> regions,
-) async {
+  List<MaskRegion> regions, {
+  bool withTextures = true,
+}) async {
   late ByteData data;
   await tester.runAsync(() async {
     final sourceRecorder = ui.PictureRecorder();
@@ -56,7 +57,9 @@ Future<ByteData> _render(
       _imageRect,
       source,
       regions,
-      textures: MaskTextures(mosaic: cache.mosaic, blur: cache.blur),
+      textures: withTextures
+          ? MaskTextures(mosaic: cache.mosaic, blur: cache.blur)
+          : MaskTextures.none,
     );
     final picture = recorder.endRecording();
     final output = await picture.toImage(200, 200);
@@ -198,6 +201,31 @@ void main() {
     expect(high.edge, 0xFF);
     expect(low.far, 0xFF);
     expect(high.far, 0xFF);
+  });
+
+  testWidgets('a region paints its shape even before its texture is ready', (
+    tester,
+  ) async {
+    // The old renderer clipped the effect to the mask's bounding rectangle, so
+    // a stroke turned into a box for as long as the offscreen layer lived. The
+    // shape must come from the path alone.
+    final data = await _render(
+      tester,
+      const [
+        MaskRegion(
+          id: 'stroke',
+          style: MaskStyle.mosaic,
+          shape: MaskShape.stroke,
+          points: [Offset(0.2, 0.5), Offset(0.8, 0.5)],
+          size: 0.1,
+        ),
+      ],
+      withTextures: false,
+    );
+
+    expect(_pixel(data, 100, 100).r, lessThan(0x60));
+    expect(_pixel(data, 100, 40), (r: 0xFF, g: 0xFF, b: 0xFF));
+    expect(_pixel(data, 100, 160), (r: 0xFF, g: 0xFF, b: 0xFF));
   });
 
   testWidgets('hidden regions are skipped', (tester) async {

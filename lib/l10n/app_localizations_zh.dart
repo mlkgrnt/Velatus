@@ -309,7 +309,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get leaveTitle => '还没导出，确定离开？';
 
   @override
-  String get leaveBody => '打码不会保存为工程文件。想保留结果的话，请先导出图片。';
+  String get leaveBody => '这次的打码不会保存。想留下结果的话，请先导出图片。';
 
   @override
   String get leave => '离开';

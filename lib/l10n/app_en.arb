@@ -126,7 +126,7 @@
   "exifStripped": "EXIF stripped",
   "footerNote": "MIT · no network · no account",
   "leaveTitle": "Leave without exporting?",
-  "leaveBody": "Masks are not stored in a project file. Export the image first if you want to keep the result.",
+  "leaveBody": "This edit is not saved anywhere. Export the image first if you want to keep it.",
   "leave": "Leave",
   "toolRoundedRect": "Rounded box",
   "roundedRectHint": "Drag a frame with soft corners",

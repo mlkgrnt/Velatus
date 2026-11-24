@@ -126,7 +126,7 @@
   "exifStripped": "已清除 EXIF",
   "footerNote": "MIT · 无网络 · 无账号",
   "leaveTitle": "还没导出，确定离开？",
-  "leaveBody": "打码不会保存为工程文件。想保留结果的话，请先导出图片。",
+  "leaveBody": "这次的打码不会保存。想留下结果的话，请先导出图片。",
   "leave": "离开",
   "toolRoundedRect": "圆角框",
   "roundedRectHint": "拖动框出一块圆角区域",

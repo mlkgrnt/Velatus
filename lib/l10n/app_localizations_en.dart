@@ -326,7 +326,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveBody =>
-      'Masks are not stored in a project file. Export the image first if you want to keep the result.';
+      'This edit is not saved anywhere. Export the image first if you want to keep it.';
 
   @override
   String get leave => 'Leave';

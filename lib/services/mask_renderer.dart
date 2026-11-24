@@ -86,6 +86,10 @@ class MaskRenderer {
         ? region.size * imageRect.shortestSide
         : 0.0;
 
+    // Until the offscreen texture for the requested strength exists, the
+    // source is sampled straight through the mask: brief, but at least it shows
+    // the photo instead of something invented. The mask shape is identical
+    // either way, which is the property the old layer-based renderer broke.
     final paint = ui.Paint()..isAntiAlias = true;
     switch (region.style) {
       case MaskStyle.solid:
@@ -93,29 +97,25 @@ class MaskRenderer {
       case MaskStyle.mosaic:
         final block = mosaicBlockPx(region.strength, sourceShortSide);
         final texture = textures.mosaic?.call(block);
-        paint.shader = texture != null
-            ? ui.ImageShader(
-                texture,
-                ui.TileMode.clamp,
-                ui.TileMode.clamp,
-                _matrixFor(texture, imageRect),
-                filterQuality: ui.FilterQuality.none,
-              )
-            : _coarseSampler(source, imageRect, block.toDouble());
+        paint.shader = ui.ImageShader(
+          texture ?? source,
+          ui.TileMode.clamp,
+          ui.TileMode.clamp,
+          _matrixFor(texture ?? source, imageRect),
+          filterQuality: texture != null
+              ? ui.FilterQuality.none
+              : ui.FilterQuality.medium,
+        );
       case MaskStyle.blur:
         final sigma = blurSigmaPx(region.strength, sourceShortSide);
         final texture = textures.blur?.call(sigma.round());
-        paint.shader = texture != null
-            ? ui.ImageShader(
-                texture,
-                ui.TileMode.clamp,
-                ui.TileMode.clamp,
-                _matrixFor(texture, imageRect),
-                filterQuality: ui.FilterQuality.medium,
-              )
-            // Until the blurred copy is ready, sample the photo coarsely so a
-            // freshly drawn region never shows the original pixels.
-            : _coarseSampler(source, imageRect, sigma);
+        paint.shader = ui.ImageShader(
+          texture ?? source,
+          ui.TileMode.clamp,
+          ui.TileMode.clamp,
+          _matrixFor(texture ?? source, imageRect),
+          filterQuality: ui.FilterQuality.medium,
+        );
     }
 
     if (region.isStroke) {
@@ -225,30 +225,5 @@ class MaskRenderer {
       0, 0, 1, 0, //
       rect.left, rect.top, 0, 1,
     ]);
-  }
-
-  /// Nearest-neighbour sampling of the source at [stride] destination pixels
-  /// per sample. Used only as an instant stand-in while a real texture renders.
-  static ImageShader _coarseSampler(
-    ui.Image source,
-    Rect imageRect,
-    double stride,
-  ) {
-    final step = math.max(1.0, stride);
-    // `ImageShader` maps texture pixels to local coordinates, so a texture
-    // pixel covers `step` destination pixels and nearest sampling quantises
-    // every block to its first source pixel.
-    return ui.ImageShader(
-      source,
-      ui.TileMode.clamp,
-      ui.TileMode.clamp,
-      Float64List.fromList(<double>[
-        imageRect.width * step / source.width, 0, 0, 0, //
-        0, imageRect.height * step / source.height, 0, 0, //
-        0, 0, 1, 0, //
-        imageRect.left, imageRect.top, 0, 1,
-      ]),
-      filterQuality: ui.FilterQuality.none,
-    );
   }
 }
