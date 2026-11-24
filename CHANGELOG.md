@@ -4,6 +4,26 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-24
+
+### Changed
+
+- Exports start at quality 100. There is no reason to throw away detail at the
+  very last step; the slider is still there if a smaller file matters more.
+- The export sheet remembers JPEG/PNG, quality and the destination (gallery or
+  Downloads on Android). On desktop the save dialog reopens in the folder where
+  the last image landed.
+
+### Added
+
+- Windows ships as one portable exe as well as the plain zip. A tiny launcher
+  with the release folder embedded unpacks once into `%LOCALAPPDATA%\Velatus\<version>`
+  and then runs velatus.exe; no installer, no admin rights. Flutter itself
+  cannot be statically linked into a single PE, so this is the honest way to
+  get a one-file download.
+- A README in five languages: Simplified Chinese, Traditional Chinese, English,
+  Spanish and French.
+
 ## [0.4.0] — 2026-11-24
 
 The "it should feel like a normal app" release. Everything here came from using
