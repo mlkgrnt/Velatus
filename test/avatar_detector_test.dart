@@ -79,6 +79,24 @@ class _Chat {
     }
   }
 
+  /// A pale line drawing on a near-white plate: only ~42 colour units from
+  /// the page, so the main foreground map sees nothing but the strokes.
+  void lineArt(int x0, int y0, int size, int seed) {
+    fill(x0, y0, x0 + size, y0 + size, 250, 250, 250);
+    final random = math.Random(seed);
+    for (var k = 0; k < size; k += 2) {
+      for (var t = 0; t < size; t++) {
+        if (random.nextInt(3) == 0) continue;
+        pixel(x0 + k, y0 + t, 30, 30, 30);
+      }
+    }
+    for (var k = 3; k < size; k += 7) {
+      for (var t = 0; t < size; t++) {
+        pixel(x0 + t, y0 + k, 40, 40, 40);
+      }
+    }
+  }
+
   /// A photo-like avatar: smooth-ish colour texture, no strong edges.
   void textured(int x0, int y0, int size) {
     for (var y = y0; y < y0 + size; y++) {
@@ -125,6 +143,13 @@ void expectOnlyAvatars(List<Rect> boxes, int count) {
   for (final box in boxes) {
     expect(box.left * 360, lessThan(60), reason: 'a box landed in the text');
     expect(box.width * 360, inInclusiveRange(24, 60));
+    // Normalised coordinates are anisotropic, so "square" has to be checked
+    // in pixel space. Avatars are never rectangles.
+    expect(
+      box.width * 360,
+      closeTo(box.height * 640, 1.5),
+      reason: 'a detected avatar box must be square in pixel space',
+    );
   }
 }
 
@@ -258,6 +283,33 @@ void main() {
     for (final box in boxes) {
       expect(box.top * 640, greaterThan(44));
       expect(box.bottom * 640, lessThan(586));
+    }
+  });
+
+  test('pale line-art avatars are recovered by their gradient density', () {
+    // The left column is only ~42 colour units from the page: the normal
+    // foreground map sees just the strokes and rejects every window. Two
+    // high-contrast outgoing avatars provide the seed and the mirrored
+    // margin, and the gentle channel recovers the pale column.
+    final chat = _Chat(background: 236);
+    for (var i = 0; i < 4; i++) {
+      final top = 60 + i * 130;
+      chat.lineArt(14, top, 40, i + 5);
+      chat.bubble(top);
+    }
+    for (var i = 0; i < 2; i++) {
+      final top = 100 + i * 260;
+      chat.disc(306, top, 40, 20 + i);
+      chat.fill(66, top, 296, top + 56, 149, 236, 105);
+      chat.textLine(76, top + 8, 280, 11);
+    }
+
+    final boxes = _find(chat);
+    expect(boxes.length, greaterThanOrEqualTo(5));
+    final pale = boxes.where((r) => r.center.dx < 0.2).toList();
+    expect(pale.length, greaterThanOrEqualTo(3));
+    for (final box in pale) {
+      expect(box.width * 360, closeTo(box.height * 640, 1.5));
     }
   });
 

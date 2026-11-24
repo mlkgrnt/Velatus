@@ -4,6 +4,41 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] — 2026-11-24
+
+### Fixed
+
+- **Every avatar box is a square in pixel space.** The shape check used to
+  return the tight bounding box of the foreground blob; for a disc or a line
+  drawing that is nearly always slightly wider than tall. Boxes are now
+  centred on the object but keep the sweep window's side length, which also
+  keeps a pale avatar's low-contrast border inside the mask. Overlapping
+  squares from nearby sweep positions are merged at output time.
+
+### Changed
+
+- **Low-contrast avatars are recoverable.** On a reported real screenshot the
+  pale line-art avatars were only ~42–57 colour units from the page, below the
+  foreground threshold of 60, so the main map saw nothing but a few strokes.
+  Gradient density is the useful signal there: a line drawing measures 30–47
+  where a flat background and a plain white bubble measure 0. A second,
+  gentler foreground map (threshold 35) and its integral image are built in
+  the same linear pre-processing pass, and consulted **only along the two
+  confirmed avatar columns** — a white bubble is the same distance from the
+  page as a white avatar, so using it near the middle would light every
+  bubble up. On that 1440×1708 screenshot the left column went from 0 of 7
+  avatars to all 7; together with the 2 outgoing ones the detector returns 9
+  square boxes.
+- The 360×640 benchmark stays at 13–15 ms (original flood-fill detector:
+  14.5 ms). The larger 540×640 real screenshot takes ~36 ms because the
+  gentle channel adds one more pass; it still runs once in a background
+  isolate.
+
+### Added
+
+- Regression tests asserting square boxes in pixel space and a pale line-art
+  avatar column. Full suite: 92 tests.
+
 ## [0.4.3] — 2026-11-24
 
 ### Changed

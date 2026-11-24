@@ -44,6 +44,13 @@ class AvatarDetector {
   /// stay firmly foreground.
   static const double foregroundThreshold = 60.0;
 
+  /// Second, gentler threshold used *only* along the confirmed avatar columns.
+  /// A white or line-art avatar can be as little as ~57 colour units from a
+  /// light grey page, below [foregroundThreshold]. A white bubble is the same
+  /// distance away, which is why this map is never consulted in the middle of
+  /// the image — there it would light every bubble up.
+  static const double lowContrastThreshold = 35.0;
+
   static List<Rect> find(Uint8List rgba, int width, int height) {
     if (width < 48 || height < 48) return const <Rect>[];
     final p = _Pyramid(rgba, width, height);
@@ -202,7 +209,12 @@ class AvatarDetector {
   /// pre-processing pass, so the expensive per-pixel colour work happens once
   /// for the whole image rather than once per candidate. [strictness] below 1
   /// is only used for positions whose location is already strong evidence.
-  static _Box? _verify(_Pyramid p, Rect rect, double strictness) {
+  static _Box? _verify(
+    _Pyramid p,
+    Rect rect,
+    double strictness, {
+    bool lowContrast = false,
+  }) {
     final w = p.width;
     final h = p.height;
     final x0 = rect.left.round();
@@ -212,16 +224,35 @@ class AvatarDetector {
       return null;
     }
 
+    final foreground = lowContrast ? p.foregroundLow : p.foreground;
     final area = size * size;
-    final covered = p.sum(p.iiForeground, x0, y0, x0 + size, y0 + size);
+    final covered = p.sum(
+      lowContrast ? p.iiForegroundLow : p.iiForeground,
+      x0,
+      y0,
+      x0 + size,
+      y0 + size,
+    );
     final coverage = covered / area;
     final meanDistance =
         p.sum(p.iiDistance, x0, y0, x0 + size, y0 + size) / area;
-    // Coverage 1.0 means the window is entirely inside one flat patch — no
-    // boundary to locate. It is what a bubble looks like when its ring is
-    // polluted by text, so it has to be rejected.
-    if (coverage < 0.50 * strictness || coverage > 0.995) return null;
-    if (meanDistance < 55 * strictness) return null;
+    // In the normal channel coverage 1.0 means the window is entirely inside
+    // one flat patch and has to be rejected. Along a confirmed avatar column
+    // it is exactly what a white or line-art avatar looks like, so the gentle
+    // channel accepts it — but demands a real, measurable colour difference
+    // from the page so plain background cannot sneak through.
+    final minCoverage = lowContrast ? 0.15 : 0.50 * strictness;
+    final maxCoverage = lowContrast ? 1.001 : 0.995;
+    final minDistance = lowContrast ? 25.0 : 55.0 * strictness;
+    if (coverage < minCoverage || coverage > maxCoverage) return null;
+    if (meanDistance < minDistance) return null;
+    // A pale line-art avatar has almost no solid fill — only strokes, which
+    // cover ~20 % of the box — but its gradient density is 30–47 where a flat
+    // background or a plain white bubble is 0. That is the signal that makes
+    // low-contrast avatars separable instead of just "lower the threshold".
+    final edgeDensity =
+        p.sum(p.iiEdge, x0, y0, x0 + size, y0 + size) / area;
+    if (lowContrast && edgeDensity < 12) return null;
 
     final rows = Int32List(size);
     final cols = Int32List(size);
@@ -229,7 +260,7 @@ class AvatarDetector {
     for (var y = 0; y < size; y++) {
       final row = (y0 + y) * w + x0;
       for (var x = 0; x < size; x++) {
-        if (p.foreground[row + x] == 0) continue;
+        if (foreground[row + x] == 0) continue;
         rows[y]++;
         cols[x]++;
         if (x < minX) minX = x;
@@ -248,7 +279,9 @@ class AvatarDetector {
     // A solid object fills most of its bounding box; a comb of glyph strokes
     // leaves holes everywhere.
     final fill = covered / (blobWidth * blobHeight);
-    if (fill < 0.62) return null;
+    // Sparse strokes are expected in the low-contrast channel; the solid-fill
+    // test only makes sense for the normal one.
+    if (!lowContrast && fill < 0.62) return null;
 
     // One connected run in both projections: a disc, a square and a rounded
     // square all satisfy it. Text gives a comb of short runs instead.
@@ -256,7 +289,7 @@ class AvatarDetector {
     final colSpan = _mainSpan(cols, size);
     if (rowSpan < 0.68 || colSpan < 0.68) return null;
 
-    final corner = _cornerFill(p, x0, y0, size);
+    final corner = _cornerFill(p, x0, y0, size, foreground);
     // Roughly pi/4 for a disc, ~0.9 for a rounded square, ~1 for a square.
     // All three are valid; this only prefers a window that looks like one of
     // them over a ragged patch of content.
@@ -264,20 +297,33 @@ class AvatarDetector {
       math.min((coverage - 0.78).abs(), (coverage - 0.88).abs()),
       (coverage - 0.98).abs(),
     );
-    if (shapeFit > 0.27) return null;
+    // A sparse stroke drawing has a coverage near 0.2, which no solid-shape
+    // template fits; the gradient test above replaces it in that channel.
+    if (!lowContrast && shapeFit > 0.27) return null;
 
     final score =
         meanDistance * 0.25 +
         (rowSpan + colSpan) * 12 +
-        (1 - shapeFit) * 18 +
+        (lowContrast
+            ? edgeDensity * 0.5
+            : math.max(0.0, 1 - shapeFit) * 18) +
         corner * 3;
-    const pad = 1;
+    // Avatars are never rectangles. The tight bounding box of a disc or of a
+    // line drawing is almost always a little wider than tall, so snap the
+    // result to a square: centre it on the object but keep the sweep window's
+    // side length. That guarantees a square, keeps a pale avatar's
+    // low-contrast border inside the box, and makes column clustering far more
+    // stable because every box has exactly the same size.
+    final cx = x0 + (minX + maxX + 1) / 2;
+    final cy = y0 + (minY + maxY + 1) / 2;
+    final left = (cx - size / 2).round().clamp(0, w - size);
+    final top = (cy - size / 2).round().clamp(0, h - size);
     return _Box(
       Rect.fromLTWH(
-        (x0 + minX - pad).toDouble(),
-        (y0 + minY - pad).toDouble(),
-        (blobWidth + 2 * pad).toDouble(),
-        (blobHeight + 2 * pad).toDouble(),
+        left.toDouble(),
+        top.toDouble(),
+        size.toDouble(),
+        size.toDouble(),
       ),
       score,
       corner: corner,
@@ -299,7 +345,13 @@ class AvatarDetector {
     return best / size;
   }
 
-  static double _cornerFill(_Pyramid p, int x0, int y0, int size) {
+  static double _cornerFill(
+    _Pyramid p,
+    int x0,
+    int y0,
+    int size,
+    Uint8List foreground,
+  ) {
     final side = math.max(2, size ~/ 5);
     var hit = 0;
     var total = 0;
@@ -313,7 +365,7 @@ class AvatarDetector {
         final row = (y0 + cy + y) * p.width + x0 + cx;
         for (var x = 0; x < side; x++) {
           total++;
-          hit += p.foreground[row + x];
+          hit += foreground[row + x];
         }
       }
     }
@@ -402,12 +454,17 @@ class AvatarDetector {
             size.toDouble(),
           );
           final area = size * size;
-          final coverage =
+          final highCoverage =
               p.sum(p.iiForeground, x, y, x + size, y + size) / area;
-          if (coverage < 0.48 || coverage > 0.995) continue;
+          final lowCoverage =
+              p.sum(p.iiForegroundLow, x, y, x + size, y + size) / area;
+          // The gentle map is allowed to see sparse strokes: a line drawing
+          // only covers ~20 % of its box. The O(1) gradient gate below does
+          // the real work of rejecting flat strips and white bubbles.
+          if (highCoverage < 0.48 && lowCoverage < 0.15) continue;
           final mean =
               p.sum(p.iiDistance, x, y, x + size, y + size) / area;
-          if (mean < 45) continue;
+          if (mean < 25) continue;
 
           // Strict check first. Most positions pass or fail here, so the
           // 4×4 signature is only computed for the handful that need a second
@@ -417,6 +474,26 @@ class AvatarDetector {
           if (checked != null) {
             _add(found, checked);
             continue;
+          }
+          // Only the extreme margins may use the gentle map. A white bubble is
+          // the same distance from the page as a white avatar, so consulting
+          // it anywhere near the middle would light every bubble up.
+          final centre = (x + size / 2) / p.width;
+          // Only the centred offset needs the gentle channel: the anchor is
+          // already taken from a confirmed avatar, so the ±3 px variants would
+          // just repeat the same expensive projection test three times.
+          if (dx == 0 && (centre < 0.14 || centre > 0.86)) {
+            // One O(1) lookup first: flat strips have no strokes at all, so
+            // they never need the full low-contrast shape check.
+            final edge =
+                p.sum(p.iiEdge, x, y, x + size, y + size) / area;
+            if (edge >= 12) {
+              final pale = _verify(p, rect, 1.0, lowContrast: true);
+              if (pale != null) {
+                _add(found, pale);
+                continue;
+              }
+            }
           }
           // Two cheap lookups gate the expensive signature: a different
           // person's avatar almost never matches the seed's overall colour.
@@ -527,7 +604,10 @@ class AvatarDetector {
         final ratio =
             (overlap.width * overlap.height) /
             math.min(other.width * other.height, r.width * r.height);
-        if (ratio > 0.55) {
+        // A pale avatar can be found at two nearby sweep positions. Merge
+        // them here rather than leaving two overlapping squares; real avatars
+        // are at least a box apart, so this never joins two different ones.
+        if (ratio > 0.35) {
           duplicate = true;
           break;
         }
@@ -728,11 +808,13 @@ class _Pyramid {
     : stride = width + 1,
       lum = Uint8List(width * height),
       foreground = Uint8List(width * height),
+      foregroundLow = Uint8List(width * height),
       iiLum = Int32List((width + 1) * (height + 1)),
       iiChroma = Int32List((width + 1) * (height + 1)),
       iiEdge = Int32List((width + 1) * (height + 1)),
       iiDistance = Int32List((width + 1) * (height + 1)),
-      iiForeground = Int32List((width + 1) * (height + 1)) {
+      iiForeground = Int32List((width + 1) * (height + 1)),
+      iiForegroundLow = Int32List((width + 1) * (height + 1)) {
     final count = width * height;
     final chroma = Uint16List(count);
     final distance = Uint16List(count);
@@ -775,6 +857,7 @@ class _Pyramid {
           (rgba[p + 2] - backgroundB).abs();
       distance[i] = d;
       foreground[i] = d > AvatarDetector.foregroundThreshold ? 1 : 0;
+      foregroundLow[i] = d > AvatarDetector.lowContrastThreshold ? 1 : 0;
     }
 
     // Pass 3: all five integral images in one sweep, plus a per-row count of
@@ -786,12 +869,14 @@ class _Pyramid {
       var rowEdge = 0;
       var rowDistance = 0;
       var rowForeground = 0;
+      var rowForegroundLow = 0;
       for (var x = 0; x < width; x++) {
         final i = y * width + x;
         rowLum += lum[i];
         rowChroma += chroma[i];
         rowDistance += distance[i];
         rowForeground += foreground[i];
+        rowForegroundLow += foregroundLow[i];
         final left = x > 0 ? lum[i - 1] : lum[i];
         final right = x < width - 1 ? lum[i + 1] : lum[i];
         final up = y > 0 ? lum[i - width] : lum[i];
@@ -804,6 +889,7 @@ class _Pyramid {
         iiEdge[at] = iiEdge[above] + rowEdge;
         iiDistance[at] = iiDistance[above] + rowDistance;
         iiForeground[at] = iiForeground[above] + rowForeground;
+        iiForegroundLow[at] = iiForegroundLow[above] + rowForegroundLow;
       }
       rowHits[y] = rowForeground;
     }
@@ -838,11 +924,13 @@ class _Pyramid {
   late final int contentBottom;
   final Uint8List lum;
   final Uint8List foreground;
+  final Uint8List foregroundLow;
   final Int32List iiLum;
   final Int32List iiChroma;
   final Int32List iiEdge;
   final Int32List iiDistance;
   final Int32List iiForeground;
+  final Int32List iiForegroundLow;
 
   int sum(Int32List table, int x0, int y0, int x1, int y1) {
     final ax0 = x0.clamp(0, width);
