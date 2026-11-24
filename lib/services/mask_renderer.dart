@@ -86,10 +86,12 @@ class MaskRenderer {
         ? region.size * imageRect.shortestSide
         : 0.0;
 
-    // Until the offscreen texture for the requested strength exists, the
-    // source is sampled straight through the mask: brief, but at least it shows
-    // the photo instead of something invented. The mask shape is identical
-    // either way, which is the property the old layer-based renderer broke.
+    // Every style is drawn as `drawPath(path, paint)`, where the paint carries
+    // either a solid colour or an image shader. The shape therefore comes from
+    // the path alone, and stays identical whether or not the offscreen texture
+    // for the current strength has finished rendering. When it has not, the
+    // source image is sampled directly — briefly sharper than it should be,
+    // never a different shape.
     final paint = ui.Paint()..isAntiAlias = true;
     switch (region.style) {
       case MaskStyle.solid:
