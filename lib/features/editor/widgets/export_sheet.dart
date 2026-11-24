@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../domain/export_prefs.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/image_exporter.dart';
 import '../../../services/image_loader.dart';
@@ -24,28 +25,35 @@ Future<ExportSelection?> showExportSheet(
   BuildContext context, {
   required LoadedImage image,
   required bool canGallery,
+  ExportPrefs prefs = const ExportPrefs(),
 }) {
   return showModalBottomSheet<ExportSelection>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _ExportSheet(image: image, canGallery: canGallery),
+    builder: (context) =>
+        _ExportSheet(image: image, canGallery: canGallery, prefs: prefs),
   );
 }
 
 class _ExportSheet extends StatefulWidget {
-  const _ExportSheet({required this.image, required this.canGallery});
+  const _ExportSheet({
+    required this.image,
+    required this.canGallery,
+    required this.prefs,
+  });
 
   final LoadedImage image;
   final bool canGallery;
+  final ExportPrefs prefs;
 
   @override
   State<_ExportSheet> createState() => _ExportSheetState();
 }
 
 class _ExportSheetState extends State<_ExportSheet> {
-  ExportFormat _format = ExportFormat.jpeg;
-  int _quality = 92;
-  bool _toGallery = true;
+  late ExportFormat _format = widget.prefs.format;
+  late int _quality = widget.prefs.quality;
+  late bool _toGallery = widget.prefs.toGallery && widget.canGallery;
 
   @override
   Widget build(BuildContext context) {

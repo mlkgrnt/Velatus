@@ -6,18 +6,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/painting.dart';
 import 'package:image/image.dart' as img;
 
+import '../domain/export_format.dart';
 import '../domain/mask_region.dart';
 import 'image_loader.dart';
 import 'mask_renderer.dart';
 import 'mask_texture_cache.dart';
 
-enum ExportFormat { jpeg, png }
-
-extension ExportFormatLabel on ExportFormat {
-  String get extension => this == ExportFormat.jpeg ? 'jpg' : 'png';
-  String get mime => this == ExportFormat.jpeg ? 'image/jpeg' : 'image/png';
-  String get label => this == ExportFormat.jpeg ? 'JPEG' : 'PNG';
-}
+export '../domain/export_format.dart';
 
 class ExportResult {
   ExportResult({
@@ -43,7 +38,7 @@ class ImageExporter {
     required LoadedImage source,
     required List<MaskRegion> regions,
     ExportFormat format = ExportFormat.jpeg,
-    int quality = 92,
+    int quality = 100,
   }) async {
     final full = await ImageLoader.decodeFull(source);
     final cache = MaskTextureCache()..attach(full);

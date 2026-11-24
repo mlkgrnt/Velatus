@@ -7,10 +7,20 @@ import 'package:gal/gal.dart';
 import 'image_exporter.dart';
 
 class ExportSaveResult {
-  const ExportSaveResult({required this.ok, this.location, this.error});
+  const ExportSaveResult({
+    required this.ok,
+    this.location,
+    this.directory,
+    this.error,
+  });
 
   final bool ok;
   final String? location;
+
+  /// The folder the file landed in, when that is a real directory. Used to
+  /// reopen the save dialog where the user last put something.
+  final String? directory;
+
   final String? error;
 }
 
@@ -22,6 +32,7 @@ class ExportSaver {
   static Future<ExportSaveResult> save(
     ExportResult result, {
     required bool toGallery,
+    String? initialDirectory,
   }) async {
     final name = ImageExporter.suggestedName(result.format);
     try {
@@ -46,7 +57,11 @@ class ExportSaver {
         final dir = await _androidOutputDir();
         final file = File('${dir.path}/$name');
         await file.writeAsBytes(result.bytes, flush: true);
-        return ExportSaveResult(ok: true, location: file.path);
+        return ExportSaveResult(
+          ok: true,
+          location: file.path,
+          directory: dir.path,
+        );
       }
 
       final typeGroup = XTypeGroup(
@@ -55,6 +70,7 @@ class ExportSaver {
       );
       final location = await getSaveLocation(
         suggestedName: name,
+        initialDirectory: initialDirectory,
         acceptedTypeGroups: [typeGroup],
       );
       if (location == null) {
@@ -64,8 +80,13 @@ class ExportSaver {
       if (!path.toLowerCase().endsWith('.${result.extension}')) {
         path = '$path.${result.extension}';
       }
-      await File(path).writeAsBytes(result.bytes, flush: true);
-      return ExportSaveResult(ok: true, location: path);
+      final file = File(path);
+      await file.writeAsBytes(result.bytes, flush: true);
+      return ExportSaveResult(
+        ok: true,
+        location: path,
+        directory: file.parent.path,
+      );
     } catch (error) {
       return ExportSaveResult(ok: false, error: error.toString());
     }

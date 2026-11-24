@@ -132,12 +132,24 @@ class _EditorPageState extends State<EditorPage> {
 
   Future<void> _export() async {
     if (_controller.busy) return;
+    final prefs = widget.settings.exportPrefs;
     final selection = await showExportSheet(
       context,
       image: widget.image,
       canGallery: ExportSaver.canSaveToGallery,
+      prefs: prefs,
     );
     if (selection == null || !mounted) return;
+    // Remember the answer before the slow part, so a failed render still
+    // leaves the sheet the way the user set it up.
+    await widget.settings.saveExportPrefs(
+      prefs.copyWith(
+        format: selection.format,
+        quality: selection.quality,
+        toGallery: selection.toGallery,
+      ),
+    );
+    if (!mounted) return;
 
     _controller.setBusy(true);
     showDialog<void>(
@@ -179,10 +191,18 @@ class _EditorPageState extends State<EditorPage> {
       final saved = await ExportSaver.save(
         result,
         toGallery: selection.toGallery,
+        initialDirectory: prefs.lastDirectory,
       );
       if (!mounted) return;
       if (saved.ok) {
         _markExported();
+        if (saved.directory != null) {
+          await widget.settings.saveExportPrefs(
+            widget.settings.exportPrefs.copyWith(
+              lastDirectory: saved.directory,
+            ),
+          );
+        }
         _showMessage(
           saved.location == null || saved.location == 'Gallery'
               ? l10n.exported

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/editor_preset.dart';
+import '../domain/export_prefs.dart';
 
 class RecentEntry {
   const RecentEntry({
@@ -45,12 +46,14 @@ class SettingsController extends ChangeNotifier {
   static const _localeKey = 'locale';
   static const _recentKey = 'recent_files';
   static const _presetKey = 'editor_preset';
+  static const _exportKey = 'export_prefs';
   static const _maxRecent = 8;
 
   ThemeMode _themeMode = ThemeMode.system;
   Locale? _locale;
   List<RecentEntry> _recent = <RecentEntry>[];
   EditorPreset _preset = const EditorPreset();
+  ExportPrefs _exportPrefs = const ExportPrefs();
   Timer? _presetTimer;
   SharedPreferences? _prefs;
 
@@ -60,6 +63,9 @@ class SettingsController extends ChangeNotifier {
 
   /// The tool and parameters the editor starts with.
   EditorPreset get preset => _preset;
+
+  /// Format, quality and destination of the last export.
+  ExportPrefs get exportPrefs => _exportPrefs;
 
   Future<void> load() async {
     try {
@@ -76,6 +82,13 @@ class SettingsController extends ChangeNotifier {
         final decoded = jsonDecode(preset);
         if (decoded is Map<String, Object?>) {
           _preset = EditorPreset.fromJson(decoded);
+        }
+      }
+      final export = _prefs?.getString(_exportKey);
+      if (export != null && export.isNotEmpty) {
+        final decoded = jsonDecode(export);
+        if (decoded is Map<String, Object?>) {
+          _exportPrefs = ExportPrefs.fromJson(decoded);
         }
       }
       final raw = _prefs?.getString(_recentKey);
@@ -143,6 +156,14 @@ class SettingsController extends ChangeNotifier {
     _preset = preset;
     _presetTimer?.cancel();
     _presetTimer = Timer(const Duration(milliseconds: 400), _flushPreset);
+  }
+
+  /// Remembers the export sheet's answer. Called once per export, so no
+  /// debounce is needed here.
+  Future<void> saveExportPrefs(ExportPrefs prefs) async {
+    if (_exportPrefs == prefs) return;
+    _exportPrefs = prefs;
+    await _prefs?.setString(_exportKey, jsonEncode(prefs.toJson()));
   }
 
   void _flushPreset() {
