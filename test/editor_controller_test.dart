@@ -156,7 +156,7 @@ void main() {
     });
   });
 
-  testWidgets('moving the selection keeps the whole group on the picture', (
+  testWidgets('moving one member of a multi-selection leaves the others alone', (
     tester,
   ) async {
     await tester.runAsync(() async {
@@ -170,12 +170,50 @@ void main() {
       controller.selectAt(const ui.Offset(0.2, 0.2));
       controller.selectAt(const ui.Offset(0.7, 0.6));
 
-      controller.translateSelected(const ui.Offset(0.5, 0.5));
+      // The finger landed on "b", which became primary; "a" is still selected
+      // but must not move with it.
+      controller.translatePrimary(const ui.Offset(0.5, 0.5));
 
-      // The right-most box already touches x = 0.9, so the group can only move
-      // by 0.1 before it would leave the image.
-      expect(controller.regions[1].normalizedBounds.right, closeTo(1.0, 1e-9));
-      expect(controller.regions[0].normalizedBounds.left, closeTo(0.2, 1e-9));
+      // "b" already touches x = 0.9, so it can only slide 0.1 sideways.
+      expect(
+        controller.regions[1].normalizedBounds,
+        const ui.Rect.fromLTRB(0.6, 0.8, 1.0, 1.0),
+      );
+      expect(
+        controller.regions[0].normalizedBounds,
+        const ui.Rect.fromLTRB(0.1, 0.1, 0.3, 0.25),
+      );
+      expect(controller.selectionCount, 2);
+    });
+  });
+
+  testWidgets('the content signature follows edits but not selection', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      image = await makeImage();
+      final controller = EditorController(image: image);
+      addTearDown(controller.dispose);
+      controller.addRegions([
+        box('a', const ui.Rect.fromLTRB(0.1, 0.1, 0.4, 0.3)),
+      ]);
+      final saved = controller.contentSignature;
+
+      // Selecting, deselecting and hovering around must not look like an edit,
+      // otherwise leaving right after an export would still nag.
+      controller.selectAt(const ui.Offset(0.2, 0.2));
+      expect(controller.contentSignature, saved);
+      controller.clearSelection();
+      expect(controller.contentSignature, saved);
+
+      // Moving or restyling must.
+      controller.selectOnly('a');
+      controller.translatePrimary(const ui.Offset(0.05, 0));
+      expect(controller.contentSignature, isNot(saved));
+
+      final moved = controller.contentSignature;
+      controller.setStyle(MaskStyle.blur);
+      expect(controller.contentSignature, isNot(moved));
     });
   });
 

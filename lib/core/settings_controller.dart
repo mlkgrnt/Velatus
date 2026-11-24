@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../domain/editor_preset.dart';
 
 class RecentEntry {
   const RecentEntry({
@@ -41,16 +44,22 @@ class SettingsController extends ChangeNotifier {
   static const _themeKey = 'theme_mode';
   static const _localeKey = 'locale';
   static const _recentKey = 'recent_files';
+  static const _presetKey = 'editor_preset';
   static const _maxRecent = 8;
 
   ThemeMode _themeMode = ThemeMode.system;
   Locale? _locale;
   List<RecentEntry> _recent = <RecentEntry>[];
+  EditorPreset _preset = const EditorPreset();
+  Timer? _presetTimer;
   SharedPreferences? _prefs;
 
   ThemeMode get themeMode => _themeMode;
   Locale? get locale => _locale;
   List<RecentEntry> get recent => List.unmodifiable(_recent);
+
+  /// The tool and parameters the editor starts with.
+  EditorPreset get preset => _preset;
 
   Future<void> load() async {
     try {
@@ -61,8 +70,14 @@ class SettingsController extends ChangeNotifier {
         'dark' => ThemeMode.dark,
         _ => ThemeMode.system,
       };
-      final locale = _prefs?.getString(_localeKey);
-      _locale = (locale == null || locale.isEmpty) ? null : Locale(locale);
+      _locale = _decodeLocale(_prefs?.getString(_localeKey));
+      final preset = _prefs?.getString(_presetKey);
+      if (preset != null && preset.isNotEmpty) {
+        final decoded = jsonDecode(preset);
+        if (decoded is Map<String, Object?>) {
+          _preset = EditorPreset.fromJson(decoded);
+        }
+      }
       final raw = _prefs?.getString(_recentKey);
       if (raw != null) {
         final decoded = jsonDecode(raw);
@@ -93,10 +108,52 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> setLocale(Locale? locale) async {
-    if (_locale?.languageCode == locale?.languageCode) return;
+    if (_encodeLocale(_locale) == _encodeLocale(locale)) return;
     _locale = locale;
     notifyListeners();
-    await _prefs?.setString(_localeKey, locale?.languageCode ?? '');
+    await _prefs?.setString(_localeKey, _encodeLocale(locale) ?? '');
+  }
+
+  /// Simplified and Traditional Chinese share a language code, so the script
+  /// has to travel with it — otherwise picking 繁體中文 would quietly store
+  /// plain `zh` and reopen as 简体.
+  static String? _encodeLocale(Locale? locale) {
+    if (locale == null) return null;
+    final script = locale.scriptCode;
+    return script == null || script.isEmpty
+        ? locale.languageCode
+        : '${locale.languageCode}_$script';
+  }
+
+  static Locale? _decodeLocale(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final parts = raw.split('_');
+    if (parts.length >= 2) {
+      return Locale.fromSubtags(languageCode: parts[0], scriptCode: parts[1]);
+    }
+    return Locale(raw);
+  }
+
+  /// Remembers the editor's tool choice.
+  ///
+  /// Sliders emit on every pixel of movement, so the write is coalesced: the
+  /// value is live in memory at once and hits disk only after the hand stops.
+  void savePreset(EditorPreset preset) {
+    if (_preset == preset) return;
+    _preset = preset;
+    _presetTimer?.cancel();
+    _presetTimer = Timer(const Duration(milliseconds: 400), _flushPreset);
+  }
+
+  void _flushPreset() {
+    _prefs?.setString(_presetKey, jsonEncode(_preset.toJson()));
+  }
+
+  @override
+  void dispose() {
+    if (_presetTimer?.isActive ?? false) _flushPreset();
+    _presetTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> addRecent({required String path, required String name}) async {

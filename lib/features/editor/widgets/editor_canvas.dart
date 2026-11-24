@@ -32,9 +32,22 @@ class _EditorCanvasState extends State<EditorCanvas> {
 
   _Gesture _gesture = _Gesture.none;
   Offset _downPoint = Offset.zero;
+
+  /// Where the finger actually landed.
+  ///
+  /// `onScaleStart` reports the focal point *after* the gesture has travelled
+  /// past the touch slop, which on a phone is already 30-odd pixels away. Hit
+  /// testing a 22 px corner handle against that point misses almost every time,
+  /// so grabbing a corner degraded into dragging the whole box.
+  Offset? _pressPoint;
   Offset _lastNorm = Offset.zero;
   bool _moved = false;
-  int _corner = -1;
+
+  /// The corner opposite to the dragged handle, captured once when the gesture
+  /// starts. Deriving it from the live frame every update was what made a box
+  /// collapse into a line and then get shoved around: as the box shrank, its
+  /// "opposite" corner moved with it, so the anchor chased the finger.
+  Offset _resizeAnchor = Offset.zero;
 
   double _startScale = 1;
   double _gestureBaseScale = 1;
@@ -118,12 +131,18 @@ class _EditorCanvasState extends State<EditorCanvas> {
     return -1;
   }
 
-  Offset _cornerPoint(Rect rect, int index) {
+  /// The normalized point that stays put while corner [index] is dragged.
+  ///
+  /// It is read from the region's own bounds — the same space `resizeSelected`
+  /// works in — and never recomputed mid-gesture, which is what allows the
+  /// dragged corner to pass the anchor and land in any of the four quadrants.
+  Offset _anchorFor(MaskRegion region, int index) {
+    final b = region.normalizedBounds;
     return switch (index) {
-      0 => rect.topLeft,
-      1 => rect.topRight,
-      2 => rect.bottomLeft,
-      _ => rect.bottomRight,
+      0 => Offset(b.right, b.bottom),
+      1 => Offset(b.left, b.bottom),
+      2 => Offset(b.right, b.top),
+      _ => Offset(b.left, b.top),
     };
   }
 
@@ -201,7 +220,9 @@ class _EditorCanvasState extends State<EditorCanvas> {
 
   void _handleScaleStart(ScaleStartDetails details, Size canvas) {
     final rect = _displayRect(canvas);
-    final local = details.localFocalPoint;
+    final local = details.pointerCount >= 2
+        ? details.localFocalPoint
+        : (_pressPoint ?? details.localFocalPoint);
 
     if (details.pointerCount >= 2) {
       if (_gesture == _Gesture.draw) c.cancelDraft();
@@ -222,14 +243,16 @@ class _EditorCanvasState extends State<EditorCanvas> {
         if (corner >= 0) {
           c.focusSelection(region.id);
           _gesture = _Gesture.resize;
-          _corner = corner;
+          _resizeAnchor = _anchorFor(region, corner);
           c.beginScrub();
           return;
         }
       }
-      // Dragging any selected block moves the whole selection.
-      for (final region in c.selectedRegions) {
+      // Dragging a block moves that block only. The rest of the selection stays
+      // put but remains selected, so a following slider still hits all of them.
+      for (final region in c.selectedRegions.reversed) {
         if (region.hitTest(_lastNorm, 0.012)) {
+          c.focusSelection(region.id);
           _gesture = _Gesture.move;
           c.beginScrub();
           return;
@@ -263,40 +286,28 @@ class _EditorCanvasState extends State<EditorCanvas> {
         c.updateAt(_lastNorm);
       case _Gesture.move:
         final norm = _rawNormalize(local, rect);
-        c.translateSelected(norm - _lastNorm);
+        c.translatePrimary(norm - _lastNorm);
         _lastNorm = norm;
       case _Gesture.resize:
         final region = c.primaryRegion;
         if (region == null) return;
-        final frame = _frameFor(region, rect);
+        final pointer = _rawNormalize(local, rect);
+        // A brush stroke is drawn as a wide line, so its handles sit half a
+        // stroke outside the centre line. Inset the finger by that much on the
+        // side being dragged, towards the anchor.
         final pad = region.isStroke
             ? region.size * rect.shortestSide / 2
             : 0.0;
-        final anchorNorm = _rawNormalize(
-          _cornerPoint(frame, switch (_corner) {
-            0 => 3,
-            1 => 2,
-            2 => 1,
-            _ => 0,
-          }),
-          rect,
-        );
-        final box = Rect.fromPoints(
-          anchorNorm,
-          _rawNormalize(local, rect),
-        );
         final padX = rect.width == 0 ? 0.0 : pad / rect.width;
         final padY = rect.height == 0 ? 0.0 : pad / rect.height;
-        // `resizeSelected` works on the centre-line box, so the visual padding
-        // of a brush stroke is removed again before handing it over.
-        c.resizeSelected(
-          Rect.fromLTRB(
-            box.left + padX,
-            box.top + padY,
-            math.max(box.left + padX + 0.004, box.right - padX),
-            math.max(box.top + padY + 0.004, box.bottom - padY),
-          ),
+        final toAnchor = _resizeAnchor - pointer;
+        final dragged = Offset(
+          pointer.dx + toAnchor.dx.sign * padX,
+          pointer.dy + toAnchor.dy.sign * padY,
         );
+        // `Rect.fromPoints` normalises, so dragging past the anchor simply puts
+        // the box in the opposite quadrant instead of flattening it.
+        c.resizeSelected(Rect.fromPoints(_resizeAnchor, dragged));
       case _Gesture.zoom:
         _updateZoom(details, canvas);
       case _Gesture.none:
@@ -316,7 +327,6 @@ class _EditorCanvasState extends State<EditorCanvas> {
       c.endScrub();
     }
     _gesture = _Gesture.none;
-    _corner = -1;
   }
 
   @override
@@ -357,7 +367,9 @@ class _EditorCanvasState extends State<EditorCanvas> {
               if (event.buttons == kMiddleMouseButton) {
                 _panStart = event.localPosition;
                 _panOrigin = _offset;
+                return;
               }
+              _pressPoint = event.localPosition;
             },
             onPointerMove: (event) {
               if (_panStart != null) {
@@ -366,8 +378,14 @@ class _EditorCanvasState extends State<EditorCanvas> {
                 });
               }
             },
-            onPointerUp: (_) => _panStart = null,
-            onPointerCancel: (_) => _panStart = null,
+            onPointerUp: (_) {
+              _panStart = null;
+              _pressPoint = null;
+            },
+            onPointerCancel: (_) {
+              _panStart = null;
+              _pressPoint = null;
+            },
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTapUp: (details) => _handleTap(details.localPosition, size),

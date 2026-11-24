@@ -4,21 +4,39 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
+import '../../domain/editor_preset.dart';
 import '../../domain/mask_region.dart';
 import '../../services/image_exporter.dart';
 import '../../services/image_loader.dart';
 import '../../services/mask_renderer.dart';
 import '../../services/mask_texture_cache.dart';
 
-enum EditorTool { brush, box, select }
+export '../../domain/editor_preset.dart' show EditorTool;
 
 class EditorController extends ChangeNotifier {
-  EditorController({required this.image}) {
+  EditorController({
+    required this.image,
+    EditorPreset preset = const EditorPreset(),
+    this.onPresetChanged,
+  }) {
+    _tool = preset.tool;
+    _lastDrawTool = preset.tool == EditorTool.select
+        ? EditorTool.brush
+        : preset.tool;
+    _style = preset.style;
+    _brushSize = preset.brushSize;
+    _strength = preset.strength;
+    _radius = preset.radius;
+    _solidColor = preset.color;
     _textureCache.attach(image.preview);
     _warmTextures(immediate: true);
   }
 
   final LoadedImage image;
+
+  /// Called whenever the user changes tool or parameters, so the choice can be
+  /// remembered for the next picture.
+  final ValueChanged<EditorPreset>? onPresetChanged;
   final MaskTextureCache _textureCache = MaskTextureCache();
 
   final List<MaskRegion> _regions = <MaskRegion>[];
@@ -37,6 +55,7 @@ class EditorController extends ChangeNotifier {
   final Set<String> _pendingIds = <String>{};
 
   EditorTool _tool = EditorTool.brush;
+  EditorTool _lastDrawTool = EditorTool.brush;
   MaskStyle _style = MaskStyle.mosaic;
   double _brushSize = 0.055;
   double _strength = 0.65;
@@ -61,7 +80,46 @@ class EditorController extends ChangeNotifier {
   bool get canRedo => _redoStack.isNotEmpty;
   bool get hasMasks => _regions.isNotEmpty;
 
+  /// A cheap fingerprint of what is currently masked.
+  ///
+  /// The editor compares it against the fingerprint captured at the last
+  /// successful export, so leaving right after saving does not nag with
+  /// "you have not exported yet" — while editing again afterwards correctly
+  /// brings the warning back.
+  int get contentSignature {
+    var hash = 0x811c9dc5;
+    void mix(int value) {
+      hash = ((hash ^ value) * 0x01000193) & 0x3fffffff;
+    }
+
+    for (final region in _regions) {
+      mix(region.style.index + 1);
+      mix(region.shape.index + 1);
+      mix((region.strength * 1000).round());
+      mix((region.radius * 1000).round());
+      mix(region.color.toARGB32());
+      mix(region.points.length);
+      for (final point in region.points) {
+        mix((point.dx * 1e6).round());
+        mix((point.dy * 1e6).round());
+      }
+    }
+    return hash;
+  }
+
   int get maskCount => _regions.length;
+
+  /// The current tool and parameters, ready to be stored.
+  EditorPreset get preset => EditorPreset(
+    tool: _tool == EditorTool.select ? _lastDrawTool : _tool,
+    style: _style,
+    brushSize: _brushSize,
+    strength: _strength,
+    radius: _radius,
+    color: _solidColor,
+  );
+
+  void _persistPreset() => onPresetChanged?.call(preset);
 
   // ---------------------------------------------------------------- selection
 
@@ -126,12 +184,17 @@ class EditorController extends ChangeNotifier {
     _tool = value;
     _draft = null;
     // Picking a drawing tool means you are done with the current block.
-    if (value != EditorTool.select) clearSelection();
+    if (value != EditorTool.select) {
+      _lastDrawTool = value;
+      clearSelection();
+    }
     notifyListeners();
+    _persistPreset();
   }
 
   void setStyle(MaskStyle value) {
     _style = value;
+    _persistPreset();
     _applyToPending(
       (region) => region.copyWith(
         style: value,
@@ -159,6 +222,7 @@ class EditorController extends ChangeNotifier {
 
   void setBrushSize(double value) {
     _brushSize = value.clamp(0.005, 0.4);
+    _persistPreset();
     _applyToPending(
       (region) => region.isStroke ? region.copyWith(size: _brushSize) : region,
     );
@@ -169,6 +233,7 @@ class EditorController extends ChangeNotifier {
 
   void setStrength(double value) {
     _strength = value.clamp(0.02, 1.0);
+    _persistPreset();
     _applyToPending(
       (region) => region.style == MaskStyle.solid
           ? region
@@ -184,6 +249,7 @@ class EditorController extends ChangeNotifier {
 
   void setRadius(double value) {
     _radius = value.clamp(0.0, 0.5);
+    _persistPreset();
     _applyToPending(
       (region) => region.isFill ? region.copyWith(radius: _radius) : region,
     );
@@ -194,6 +260,7 @@ class EditorController extends ChangeNotifier {
 
   void setSolidColor(Color value) {
     _solidColor = value;
+    _persistPreset();
     _applyToPending(
       (region) => region.style == MaskStyle.solid
           ? region.copyWith(color: value)
@@ -428,32 +495,22 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Moves the whole selection, keeping the group inside the picture.
-  void translateSelected(Offset delta) {
-    if (_selectedIds.isEmpty) return;
-    var bounds = Rect.zero;
-    var first = true;
-    for (final region in _regions) {
-      if (!_selectedIds.contains(region.id)) continue;
-      final box = region.normalizedBounds;
-      bounds = first
-          ? box
-          : Rect.fromLTRB(
-              math.min(bounds.left, box.left),
-              math.min(bounds.top, box.top),
-              math.max(bounds.right, box.right),
-              math.max(bounds.bottom, box.bottom),
-            );
-      first = false;
-    }
-    if (first) return;
+  /// Moves the region under the finger, and nothing else.
+  ///
+  /// Dragging used to shift the whole selection, which made a multi-selection
+  /// impossible to nudge one block at a time — and left the neighbours as a
+  /// rigid group you could never separate again. The selection is kept as it
+  /// is, so a following parameter change still applies to every member.
+  void translatePrimary(Offset delta) {
+    final region = primaryRegion;
+    if (region == null) return;
+    final bounds = region.normalizedBounds;
     final dx = delta.dx.clamp(-bounds.left, 1 - bounds.right);
     final dy = delta.dy.clamp(-bounds.top, 1 - bounds.bottom);
     if (dx == 0 && dy == 0) return;
-    for (var i = 0; i < _regions.length; i++) {
-      if (!_selectedIds.contains(_regions[i].id)) continue;
-      _regions[i] = _regions[i].translated(Offset(dx, dy));
-    }
+    final index = _regions.indexWhere((item) => item.id == region.id);
+    if (index < 0) return;
+    _regions[index] = region.translated(Offset(dx, dy));
     notifyListeners();
   }
 

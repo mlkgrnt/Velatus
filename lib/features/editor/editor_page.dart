@@ -36,13 +36,23 @@ class _EditorPageState extends State<EditorPage> {
   bool _scanRunning = false;
   bool _allowPop = false;
 
+  /// Fingerprint of the masks at the last successful export. When it still
+  /// matches, leaving needs no confirmation.
+  int? _exportedSignature;
+
   AppLocalizations get l10n => AppLocalizations.of(context);
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _controller = widget.controller ?? EditorController(image: widget.image);
+    _controller =
+        widget.controller ??
+        EditorController(
+          image: widget.image,
+          preset: widget.settings.preset,
+          onPresetChanged: widget.settings.savePreset,
+        );
   }
 
   @override
@@ -162,6 +172,7 @@ class _EditorPageState extends State<EditorPage> {
       if (selection.share) {
         final file = await ExportSaver.temporaryFile(result);
         await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+        _markExported();
         return;
       }
 
@@ -171,6 +182,7 @@ class _EditorPageState extends State<EditorPage> {
       );
       if (!mounted) return;
       if (saved.ok) {
+        _markExported();
         _showMessage(
           saved.location == null || saved.location == 'Gallery'
               ? l10n.exported
@@ -189,15 +201,37 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
+  /// True when closing the editor loses nothing: no masks at all, or the masks
+  /// are exactly what was exported last.
+  bool get _nothingToLose =>
+      !_controller.hasMasks ||
+      _exportedSignature == _controller.contentSignature;
+
+  /// Records that the current masks are safely in a file, so leaving no longer
+  /// needs a warning. Editing afterwards changes the fingerprint and arms it
+  /// again.
+  void _markExported() {
+    if (!mounted) return;
+    setState(() => _exportedSignature = _controller.contentSignature);
+  }
+
   Future<void> _confirmLeave() async {
     if (_allowPop) return;
-    if (!_controller.hasMasks) {
+    if (_nothingToLose) {
       _popNow();
       return;
     }
+    final theme = Theme.of(context);
     final leave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        // Deliberately smaller than the default: this is a nudge, not a
+        // headline, and the stock Material dialog shouts it.
+        titleTextStyle: theme.textTheme.titleMedium,
+        contentTextStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          height: 1.5,
+        ),
         title: Text(l10n.leaveTitle),
         content: Text(l10n.leaveBody),
         actions: [
@@ -231,7 +265,7 @@ class _EditorPageState extends State<EditorPage> {
       listenable: _controller,
       builder: (context, _) {
         return PopScope(
-          canPop: _allowPop || !_controller.hasMasks,
+          canPop: _allowPop || _nothingToLose,
           onPopInvokedWithResult: (didPop, result) {
             if (!didPop) _confirmLeave();
           },

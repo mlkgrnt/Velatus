@@ -165,7 +165,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(controller.selectionCount, 2);
-    expect(find.text('已选 2 处 · 四角只缩放你碰到的那个'), findsOneWidget);
+    expect(find.text('已选 2 处 · 拖动和缩放都只作用在你碰到的那个'), findsOneWidget);
   });
 
   testWidgets('the scan confirmation bar fits a small phone', (tester) async {
