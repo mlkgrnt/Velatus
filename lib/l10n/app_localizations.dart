@@ -280,7 +280,7 @@ abstract class AppLocalizations {
   /// No description provided for @compare.
   ///
   /// In en, this message translates to:
-  /// **'Hold to compare'**
+  /// **'Compare'**
   String get compare;
 
   /// No description provided for @export.
@@ -442,8 +442,20 @@ abstract class AppLocalizations {
   /// No description provided for @compareHint.
   ///
   /// In en, this message translates to:
-  /// **'Hold to see the original'**
+  /// **'Tap to compare, hold to peek'**
   String get compareHint;
+
+  /// No description provided for @compareOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get compareOriginal;
+
+  /// No description provided for @compareBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to go back'**
+  String get compareBack;
 
   /// No description provided for @resetView.
   ///

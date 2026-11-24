@@ -87,7 +87,7 @@ class EditorPreset {
         orElse: () => fallback.style,
       ),
       brushSize: readRanged('brushSize', fallback.brushSize, 0.005, 0.4),
-      strength: readRanged('strength', fallback.strength, 0.02, 1.0),
+      strength: readRanged('strength', fallback.strength, 0.0, 1.0),
       radius: readRanged('radius', fallback.radius, 0.0, 0.5),
       color: Color(color is int ? color : fallback.color.toARGB32()),
     );

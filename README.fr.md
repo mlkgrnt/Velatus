@@ -28,9 +28,10 @@ son style ou le supprimer, et annulez tout jusqu'au moment de l'export.
   déplace ; un coin peut franchir le coin opposé pour basculer le cadre dans un
   autre quadrant. Style, intensité, arrondi et couleur s'appliquent à tout le
   groupe.
-- **Annuler, rétablir, comparer.** 60 étapes d'historique ; maintenez l'œil pour
-  voir l'original. Zoom au pincement, à la molette et au double toucher, défilement
-  au bouton du milieu sur ordinateur.
+- **Annuler, rétablir, comparer.** 60 étapes d'historique ; touchez l'œil pour
+  fixer l'original, touchez encore pour revenir (maintenez pour voir l'autre
+  vue). Zoom au pincement, à la molette et au double toucher, défilement au
+  bouton du milieu sur ordinateur.
 - **Il se souvient.** L'outil et les paramètres utilisés sont déjà là à
   l'ouverture de l'image suivante, tout comme le format, la qualité et la
   destination de l'export.
@@ -47,7 +48,7 @@ la précédente au lieu d'empiler une couche de plus.
 | | comment |
 | --- | --- |
 | Texte | ML Kit chinois + latin hors ligne, modèle intégré (**Android uniquement**) |
-| Avatars de discussion | Heuristique locale : bloc carré sur fond uni, répété dans une même colonne |
+| Avatars de discussion | Traitement d'image en Dart pur : contraste couleur/contours par images intégrales, forme par projection (carré, arrondi ou rond) et DFT à un seul bin pour retrouver le rythme régulier de la colonne |
 | QR codes | `zxing2`, environ 200 Ko de Dart pur, qui calcule les limites réelles du symbole |
 
 Deux précisions honnêtes : il reconnaît du *texte*, pas du *texte sensible* —

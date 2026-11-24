@@ -54,7 +54,9 @@ class ImageExporter {
       // `toImage` is asynchronous, so a lazily requested texture would miss the
       // export frame and silently bake the original pixels into the file.
       for (final region in regions) {
-        if (!region.visible) continue;
+        // A zero-strength mask samples the source directly; there is no texture
+        // to build for it, and at export resolution that would be expensive.
+        if (!region.visible || region.strength <= 0) continue;
         switch (region.style) {
           case MaskStyle.mosaic:
             await cache.ensureMosaic(

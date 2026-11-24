@@ -397,6 +397,26 @@ class _EditorPageState extends State<EditorPage> {
                               ),
                             ),
                           ),
+                          // Without a visible label, "show the original" is
+                          // indistinguishable from a broken button — especially
+                          // before any mask has been drawn, when the pixels do
+                          // not change at all.
+                          if (_controller.showOriginal)
+                            Positioned(
+                              top: 12,
+                              left: 0,
+                              right: 0,
+                              child: IgnorePointer(
+                                child: Center(
+                                  child: _OriginalBadge(
+                                    pinned: _controller.compareMode,
+                                    label: _controller.compareMode
+                                        ? '${l10n.compareOriginal} · ${l10n.compareBack}'
+                                        : l10n.compareOriginal,
+                                  ),
+                                ),
+                              ),
+                            ),
                           if (_controller.hasPending)
                             Positioned(
                               left: 12,
@@ -449,21 +469,69 @@ class _CompareButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final pinned = controller.compareMode;
+    final showing = controller.showOriginal;
     return Tooltip(
-      message: l10n.compareHint,
+      message: pinned ? l10n.compareBack : l10n.compareHint,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => controller.setShowOriginal(true),
-        onTapUp: (_) => controller.setShowOriginal(false),
-        onTapCancel: () => controller.setShowOriginal(false),
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(
-            controller.showOriginal
-                ? Icons.visibility_rounded
-                : Icons.visibility_outlined,
+        // A tap pins one side of the comparison; a long press peeks at the
+        // *other* side while the finger is down. The gesture arena decides
+        // which won, so they never fight over the same press. The old button
+        // only listened to tap-down/tap-up, which is why a normal tap did
+        // nothing visible.
+        onTap: controller.toggleCompare,
+        onLongPressStart: (_) =>
+            controller.setShowOriginal(!controller.compareMode),
+        onLongPressEnd: (_) => controller.releasePreview(),
+        onLongPressCancel: controller.releasePreview,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: pinned ? theme.colorScheme.secondaryContainer : null,
+            borderRadius: BorderRadius.circular(20),
           ),
+          child: Icon(
+            showing ? Icons.visibility_rounded : Icons.visibility_outlined,
+            size: 21,
+            color: pinned
+                ? theme.colorScheme.onSecondaryContainer
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OriginalBadge extends StatelessWidget {
+  const _OriginalBadge({required this.pinned, required this.label});
+
+  final bool pinned;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: pinned
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.94)
+            : theme.colorScheme.inverseSurface.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: pinned
+              ? theme.colorScheme.onSecondaryContainer
+              : theme.colorScheme.onInverseSurface,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

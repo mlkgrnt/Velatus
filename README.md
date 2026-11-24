@@ -26,8 +26,9 @@ it — and undo any of that — right up until you export.
   Dragging one mask out of a multi-selection moves only that one; a corner can
   be pulled past the opposite corner to flip the box into another quadrant.
   Style, strength, radius and colour apply to the whole selection at once.
-- **Undo, redo, compare.** 60 steps of history; hold the eye button to peek at
-  the original. Pinch, wheel and double-tap zoom, middle-drag pan on desktop.
+- **Undo, redo, compare.** 60 steps of history. Tap the eye to pin the
+  original on screen and tap again to return; hold it to peek at the other
+  side. Pinch, wheel and double-tap zoom, middle-drag pan on desktop.
 - **It remembers.** The tool and parameters you used last are there when you
   open the next picture. So is the export format, quality and destination.
 
@@ -43,7 +44,7 @@ replaces the previous set instead of piling another layer on top.
 | | how |
 | --- | --- |
 | Text | ML Kit Chinese + Latin text recognition, bundled offline (**Android only**) |
-| Chat avatars | On-device heuristic: a square block on a flat background, repeating down a column |
+| Chat avatars | Pure-Dart image processing: integral-image colour and edge contrast, projection shape checks (square, rounded or round), and a single-bin DFT that recovers the regular rhythm of a chat column |
 | QR codes | `zxing2`, about 200 KB of pure Dart, finds the real symbol bounds |
 
 Two honest notes: it recognises *text*, not *sensitive text* — you decide what

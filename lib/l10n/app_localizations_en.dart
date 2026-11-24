@@ -101,7 +101,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get redo => 'Redo';
 
   @override
-  String get compare => 'Hold to compare';
+  String get compare => 'Compare';
 
   @override
   String get export => 'Export';
@@ -217,7 +217,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pendingClear => 'Select none';
 
   @override
-  String get compareHint => 'Hold to see the original';
+  String get compareHint => 'Tap to compare, hold to peek';
+
+  @override
+  String get compareOriginal => 'Original';
+
+  @override
+  String get compareBack => 'Tap again to go back';
 
   @override
   String get resetView => 'Reset view';

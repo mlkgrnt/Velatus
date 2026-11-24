@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// It is duplicated in `pubspec.yaml`; the CI workflow is the only thing that
 /// reads both, so a mismatch shows up as a stale label rather than a build
 /// failure. Keep them in sync when releasing.
-const String kAppVersion = '0.4.1';
+const String kAppVersion = '0.4.2';
 
 const String kRepoUrl = 'https://github.com/mlkgrnt/Velatus';
 const String kReleasesUrl = '$kRepoUrl/releases/latest';

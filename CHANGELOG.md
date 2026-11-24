@@ -4,6 +4,34 @@ All notable changes to Velatus are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — 2026-11-24
+
+### Changed
+
+- Avatar detection was rebuilt with classical image processing. Integral
+  images of luminance, chroma and a 2-tap gradient replace the old "busy square
+  on a perfectly flat ring" test; a projection and compactness check now
+  accepts square, rounded-square and round avatars, including smooth gradients
+  and photos. A single-bin DFT (Goertzel) cross-checks the repeating pitch of a
+  chat column and re-tests positions the coarse sweep missed. On the synthetic
+  chat screenshot this went from 0 detected avatars to 3 with no false
+  positives, and the pass got slightly faster (14.5 ms → ~12.5 ms at 360 × 640).
+  The dominant page colour is estimated once from a colour histogram, so white
+  or green bubbles no longer get mistaken for avatars.
+- The eye in the editor is a real comparison control now: tap to pin the
+  original, tap again to return, hold to peek at the other side. It shows a
+  visible badge and drops out of the original view on the first canvas touch,
+  because outlines and handles are hidden in that view.
+- Mosaic and blur strength can go all the way to **0**. At that end the mask
+  leaves the pixels untouched and allocates no offscreen texture — important
+  at export resolution — while the region stays editable.
+
+### Added
+
+- Regression coverage for circular, square, rounded-square, photo-textured and
+  green-bubble avatars, plus a timing assertion keeping the detector in the
+  same speed class. Full suite: 89 tests.
+
 ## [0.4.1] — 2026-11-24
 
 ### Changed

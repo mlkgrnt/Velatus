@@ -241,4 +241,65 @@ void main() {
 
     expect(_pixel(data, 100, 100), (r: 0xFF, g: 0xFF, b: 0xFF));
   });
+
+  testWidgets('zero strength asks for no texture but keeps the region', (
+    tester,
+  ) async {
+    // A no-op mask must not build a 1 px mosaic of a 48 MP photo. It samples
+    // the source straight through, so the shape stays paintable and editable.
+    late int lookups;
+    late ByteData data;
+    await tester.runAsync(() async {
+      final sourceRecorder = ui.PictureRecorder();
+      ui.Canvas(sourceRecorder).drawRect(
+        const ui.Rect.fromLTWH(0, 0, 120, 120),
+        Paint()..color = const ui.Color(0xFF000000),
+      );
+      final source =
+          await sourceRecorder.endRecording().toImage(120, 120);
+
+      lookups = 0;
+      final textures = MaskTextures(
+        mosaic: (block) {
+          lookups++;
+          return null;
+        },
+        blur: (sigma) {
+          lookups++;
+          return null;
+        },
+      );
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(
+        _imageRect,
+        Paint()..color = const ui.Color(0xFFFFFFFF),
+      );
+      MaskRenderer.paintRegion(
+        canvas,
+        _imageRect,
+        source,
+        const MaskRegion(
+          id: 'zero',
+          style: MaskStyle.mosaic,
+          shape: MaskShape.box,
+          points: [Offset(0.2, 0.2), Offset(0.8, 0.8)],
+          strength: 0,
+        ),
+        textures: textures,
+      );
+      final picture = recorder.endRecording();
+      final output = await picture.toImage(200, 200);
+      data = (await output.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      picture.dispose();
+      output.dispose();
+      source.dispose();
+    });
+
+    expect(lookups, 0, reason: 'a no-op mask allocates no offscreen bitmap');
+    expect(_pixel(data, 100, 100).r, lessThan(0x60));
+    expect(_pixel(data, 10, 100).r, 0xFF);
+  });
 }

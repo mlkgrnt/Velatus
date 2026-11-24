@@ -345,7 +345,7 @@ void main() {
       // ignore: invalid_use_of_visible_for_testing_member
       final avatarPixels = await DetectorService.analysisPixels(
         image,
-        maxSide: 720,
+        maxSide: DetectorService.avatarAnalysisSide,
       );
       // ignore: invalid_use_of_visible_for_testing_member
       final qrPixels = await DetectorService.analysisPixels(image, maxSide: 900);

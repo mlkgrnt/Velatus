@@ -189,7 +189,10 @@ class _ParametersRow extends StatelessWidget {
                     icon: Icons.opacity_rounded,
                     tooltip: l10n.strength,
                     value: controller.strength,
-                    min: 0.05,
+                    // Zero is a real choice: at the far left the mask leaves the
+                    // pixels alone, so the whole range from "nothing" to "fully
+                    // dissolved" is available without changing tools.
+                    min: 0,
                     max: 1,
                     onStart: controller.beginScrub,
                     onEnd: controller.endScrub,

@@ -97,7 +97,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get redo => '重做';
 
   @override
-  String get compare => '按住对比';
+  String get compare => '前后对比';
 
   @override
   String get export => '导出';
@@ -194,7 +194,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pendingClear => '全不选';
 
   @override
-  String get compareHint => '按住查看原图';
+  String get compareHint => '点一下看打码前后，按住临时查看';
+
+  @override
+  String get compareOriginal => '原图';
+
+  @override
+  String get compareBack => '再点一次返回';
 
   @override
   String get resetView => '复位视图';
@@ -495,7 +501,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get redo => '重做';
 
   @override
-  String get compare => '按住對比';
+  String get compare => '前後對比';
 
   @override
   String get export => '匯出';
@@ -592,7 +598,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get pendingClear => '全不選';
 
   @override
-  String get compareHint => '按住查看原圖';
+  String get compareHint => '點一下看打碼前後，按住臨時查看';
+
+  @override
+  String get compareOriginal => '原圖';
+
+  @override
+  String get compareBack => '再點一次返回';
 
   @override
   String get resetView => '重設檢視';

@@ -93,12 +93,20 @@ class MaskRenderer {
     // source image is sampled directly — briefly sharper than it should be,
     // never a different shape.
     final paint = ui.Paint()..isAntiAlias = true;
+    // Strength 0 is a real setting: the region stays editable but leaves the
+    // pixels alone. Sampling the source straight through avoids building a
+    // "1 px block" texture, which for a full-resolution export would mean
+    // allocating a second full-size bitmap for a mask that changes nothing.
+    final effective = region.strength > 0;
     switch (region.style) {
       case MaskStyle.solid:
         paint.color = region.color;
       case MaskStyle.mosaic:
-        final block = mosaicBlockPx(region.strength, sourceShortSide);
-        final texture = textures.mosaic?.call(block);
+        final texture = effective
+            ? textures.mosaic?.call(
+                mosaicBlockPx(region.strength, sourceShortSide),
+              )
+            : null;
         paint.shader = ui.ImageShader(
           texture ?? source,
           ui.TileMode.clamp,
@@ -109,8 +117,11 @@ class MaskRenderer {
               : ui.FilterQuality.medium,
         );
       case MaskStyle.blur:
-        final sigma = blurSigmaPx(region.strength, sourceShortSide);
-        final texture = textures.blur?.call(sigma.round());
+        final texture = effective
+            ? textures.blur?.call(
+                blurSigmaPx(region.strength, sourceShortSide).round(),
+              )
+            : null;
         paint.shader = ui.ImageShader(
           texture ?? source,
           ui.TileMode.clamp,

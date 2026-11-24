@@ -46,7 +46,14 @@ void main() {
       'radius': 42.0,
     });
     expect(restored.brushSize, 0.4);
-    expect(restored.strength, 0.02);
+    expect(restored.strength, 0.0);
     expect(restored.radius, 0.5);
+  });
+
+  test('zero strength is a real setting, not clamped away', () {
+    const preset = EditorPreset(strength: 0);
+    expect(preset.strength, 0);
+    expect(EditorPreset.fromJson(preset.toJson()), preset);
+    expect(EditorPreset.fromJson({'strength': -8}).strength, 0);
   });
 }

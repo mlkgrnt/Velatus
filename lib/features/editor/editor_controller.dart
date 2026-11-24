@@ -62,6 +62,7 @@ class EditorController extends ChangeNotifier {
   double _radius = 0.0;
   Color _solidColor = const Color(0xFF14161C);
   bool _showOriginal = false;
+  bool _pinnedOriginal = false;
   bool _busy = false;
   double? _exportProgress;
 
@@ -74,6 +75,10 @@ class EditorController extends ChangeNotifier {
   double get radius => _radius;
   Color get solidColor => _solidColor;
   bool get showOriginal => _showOriginal;
+
+  /// True when the eye has pinned the original on screen. A long press only
+  /// previews temporarily and leaves this alone.
+  bool get compareMode => _pinnedOriginal;
   bool get busy => _busy;
   double? get exportProgress => _exportProgress;
   bool get canUndo => _undoStack.isNotEmpty;
@@ -247,7 +252,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void setStrength(double value) {
-    final next = value.clamp(0.02, 1.0).toDouble();
+    final next = value.clamp(0.0, 1.0).toDouble();
     if (_strength == next) return;
     _strength = next;
     _persistPreset();
@@ -349,6 +354,9 @@ class EditorController extends ChangeNotifier {
 
   void beginAt(Offset point) {
     if (_busy) return;
+    // Belt and braces: a drag should also leave the original view even if the
+    // pointer-down listener was bypassed.
+    exitCompare();
     if (_tool == EditorTool.select) {
       selectAt(point);
       return;
@@ -650,6 +658,28 @@ class EditorController extends ChangeNotifier {
 
   // ------------------------------------------------------------------- state
 
+  /// The eye in the app bar has two modes: a tap pins one side of the
+  /// comparison, a long press peeks at the *other* side while the finger is
+  /// down. Keeping them separate means a tap is never mistaken for a preview
+  /// and the button always has a state the user can see.
+  void toggleCompare() {
+    _pinnedOriginal = !_pinnedOriginal;
+    _showOriginal = _pinnedOriginal;
+    notifyListeners();
+  }
+
+  /// Ends a long-press peek, returning to whatever the eye pinned.
+  void releasePreview() => setShowOriginal(_pinnedOriginal);
+
+  /// Leaves the original view entirely. The canvas calls this on every press:
+  /// the original hides outlines and handles, so editing from there is blind.
+  void exitCompare() {
+    if (!_pinnedOriginal && !_showOriginal) return;
+    _pinnedOriginal = false;
+    _showOriginal = false;
+    notifyListeners();
+  }
+
   void setShowOriginal(bool value) {
     if (_showOriginal == value) return;
     _showOriginal = value;
@@ -726,7 +756,7 @@ class EditorController extends ChangeNotifier {
       final blocks = <int>{};
       final sigmas = <int>{};
       void collect(MaskStyle style, double strength, bool visible) {
-        if (!visible) return;
+        if (!visible || strength <= 0) return;
         switch (style) {
           case MaskStyle.mosaic:
             blocks.add(MaskRenderer.mosaicBlockPx(strength, shortSide));

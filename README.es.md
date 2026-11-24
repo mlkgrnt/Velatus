@@ -27,9 +27,10 @@ y deshaz cualquier paso hasta el momento de exportar.
   quitar. Al arrastrar una máscara de una selección múltiple solo se mueve esa;
   una esquina puede cruzar al otro lado y el recuadro cambia de cuadrante. El
   estilo, la intensidad, el radio y el color se aplican a toda la selección.
-- **Deshacer, rehacer, comparar.** 60 pasos de historial; mantén pulsado el ojo
-  para ver el original. Zoom con pellizco, rueda y doble toque, y arrastre con
-  el botón central en escritorio.
+- **Deshacer, rehacer, comparar.** 60 pasos de historial; toca el ojo para fijar
+  el original y vuelve a tocar para regresar (manteniéndolo ves el otro lado).
+  Zoom con pellizco, rueda y doble toque, y arrastre con el botón central en
+  escritorio.
 - **Recuerda lo que usaste.** La herramienta y los parámetros de la última vez
   están listos al abrir la siguiente imagen, igual que el formato, la calidad y
   el destino de exportación.
@@ -46,7 +47,7 @@ anterior en vez de apilar otra capa.
 | | cómo |
 | --- | --- |
 | Texto | ML Kit chino + latino sin conexión, modelo incluido (**solo Android**) |
-| Avatares de chat | Heurística local: bloque cuadrado sobre fondo plano que se repite en la misma columna |
+| Avatares de chat | Procesamiento de imagen en Dart puro: contraste de color y bordes con imágenes integrales, forma por proyección (cuadrado, redondeado o circular) y una DFT de un solo bin para recuperar el ritmo regular de la columna |
 | Códigos QR | `zxing2`, unos 200 KB de Dart puro, que calcula los límites reales del símbolo |
 
 Dos avisos honestos: reconoce *texto*, no *texto sensible* — tú decides qué es

@@ -370,6 +370,9 @@ class _EditorCanvasState extends State<EditorCanvas> {
                 return;
               }
               _pressPoint = event.localPosition;
+              // A tap is handled by onTapUp, not onScaleStart, so this is the
+              // only place that sees *every* press — including a plain tap.
+              c.exitCompare();
             },
             onPointerMove: (event) {
               if (_panStart != null) {
