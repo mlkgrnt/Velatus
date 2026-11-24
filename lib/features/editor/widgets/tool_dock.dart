@@ -109,16 +109,19 @@ class ToolDock extends StatelessWidget {
                         selected: controller.style == MaskStyle.solid,
                         onTap: () => controller.setStyle(MaskStyle.solid),
                       ),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 1,
-                        height: 26,
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.7,
+                      if (controller.style != MaskStyle.solid) ...[
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 1,
+                          height: 26,
+                          color: theme.colorScheme.outlineVariant.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: _ContextRow(controller: controller)),
+                        const SizedBox(width: 10),
+                        Expanded(child: _ContextRow(controller: controller)),
+                      ] else
+                        const Spacer(),
                       if (onOcr != null) ...[
                         const SizedBox(width: 2),
                         IconButton(
@@ -160,6 +163,14 @@ class ToolDock extends StatelessWidget {
                       ],
                     ],
                   ),
+                  if (controller.style == MaskStyle.solid) ...[
+                    const SizedBox(height: 6),
+                    // Colours get their own full-width row. Sharing the line
+                    // with the style chips left only four of eight swatches
+                    // visible on a 360 dp phone, which is exactly the "显示不全"
+                    // the colour picker was meant to fix.
+                    _ColorRow(controller: controller),
+                  ],
                 ],
               ),
             ),
@@ -177,9 +188,6 @@ class _ContextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (controller.style == MaskStyle.solid) {
-      return _ColorRow(controller: controller);
-    }
     final selected = controller.selectedRegion;
     final showSize = controller.tool == EditorTool.brush ||
         (selected?.isStroke ?? false);
@@ -315,21 +323,35 @@ class _Swatch extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.only(right: 5),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          width: 26,
-          height: 26,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            color: color,
             shape: BoxShape.circle,
             border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outlineVariant,
-              width: selected ? 2.5 : 1,
+              color: selected ? theme.colorScheme.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Center(
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                // A dark swatch on a dark bar (or white on white) needs an edge
+                // of its own, otherwise it reads as a hole.
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.9,
+                  ),
+                ),
+              ),
             ),
           ),
         ),

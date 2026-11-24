@@ -81,16 +81,25 @@ class SoftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF171B23) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark ? const Color(0xFF232833) : const Color(0xFFE9ECF2),
+    const radius = BorderRadius.all(Radius.circular(24));
+    // The card is a `Material`, not a painted box: `ListTile` and `InkWell`
+    // paint their ripples on the nearest Material ancestor, and a plain
+    // coloured `Container` hides them (which also trips an assertion in debug
+    // builds, turning the whole settings page red).
+    return Material(
+      color: isDark ? const Color(0xFF171B23) : Colors.white,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(
+            color: isDark ? const Color(0xFF232833) : const Color(0xFFE9ECF2),
+          ),
         ),
+        child: child,
       ),
-      child: child,
     );
   }
 }

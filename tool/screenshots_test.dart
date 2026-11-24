@@ -18,6 +18,7 @@ import 'package:velatus/domain/mask_region.dart';
 import 'package:velatus/features/editor/editor_controller.dart';
 import 'package:velatus/features/editor/editor_page.dart';
 import 'package:velatus/features/home/home_page.dart';
+import 'package:velatus/features/settings/settings_page.dart';
 import 'package:velatus/l10n/app_localizations.dart';
 import 'package:velatus/services/image_loader.dart';
 
@@ -234,6 +235,70 @@ void main() {
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('../docs/screenshots/editor_desktop.png'),
+    );
+  });
+
+  testWidgets('settings mobile', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // ignore: invalid_use_of_visible_for_testing_member
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsController();
+    await settings.load();
+
+    await tester.pumpWidget(
+      _app(home: SettingsPage(settings: settings), brightness: Brightness.light),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('../docs/screenshots/settings_light.png'),
+    );
+  });
+
+  testWidgets('editor solid colour row', (tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // ignore: invalid_use_of_visible_for_testing_member
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsController();
+    await settings.load();
+
+    late LoadedImage image;
+    late EditorController controller;
+    await tester.runAsync(() async {
+      final bytes = await File('docs/sample_chat.png').readAsBytes();
+      image = await ImageLoader.fromBytes(bytes, name: 'chat_with_zhang.png');
+      controller = EditorController(image: image)
+        ..setStyle(MaskStyle.solid)
+        ..addRegions([
+          const MaskRegion(
+            id: 'm1',
+            style: MaskStyle.solid,
+            shape: MaskShape.roundedRect,
+            points: [Offset(0.06, 0.36), Offset(0.9, 0.45)],
+            radius: 0.3,
+          ),
+        ])
+        ..selectAt(const Offset(0.5, 0.4));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    });
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _app(
+        home: EditorPage(image: image, settings: settings, controller: controller),
+        brightness: Brightness.dark,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('../docs/screenshots/editor_solid.png'),
     );
   });
 }

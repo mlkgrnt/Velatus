@@ -29,7 +29,7 @@ class MaskRegion {
     this.size = 0.05,
     this.strength = 0.65,
     this.radius = 0.24,
-    this.color = const Color(0xFF12141A),
+    this.color = const Color(0xFF14161C),
     this.visible = true,
   });
 
