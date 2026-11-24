@@ -66,6 +66,14 @@ class EditorPreset {
       return value is num ? value.toDouble() : or;
     }
 
+    // A preset written by an older build (or a half-written one) can hold a
+    // value outside what the sliders accept. Feed that straight back into the
+    // controller and the thumb sits pinned at an end while the field keeps a
+    // different number — the first drag then "jumps", which looks like two
+    // sliders moving together. Clamp to the very same ranges the setters use.
+    double readRanged(String key, double or, double min, double max) =>
+        readDouble(key, or).clamp(min, max).toDouble();
+
     final tool = json['tool'];
     final style = json['style'];
     final color = json['color'];
@@ -78,9 +86,9 @@ class EditorPreset {
         (value) => value.name == style,
         orElse: () => fallback.style,
       ),
-      brushSize: readDouble('brushSize', fallback.brushSize),
-      strength: readDouble('strength', fallback.strength),
-      radius: readDouble('radius', fallback.radius),
+      brushSize: readRanged('brushSize', fallback.brushSize, 0.005, 0.4),
+      strength: readRanged('strength', fallback.strength, 0.02, 1.0),
+      radius: readRanged('radius', fallback.radius, 0.0, 0.5),
       color: Color(color is int ? color : fallback.color.toARGB32()),
     );
     // `select` is a state, not a tool you can start with: there is nothing to

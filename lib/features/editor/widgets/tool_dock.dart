@@ -174,10 +174,18 @@ class _ParametersRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Row(
+            // These keys are not decoration. The row is built with `if`s, so
+            // switching to 色块 / back, or between brush width and corner
+            // radius, changes the child count. Without keys Flutter reuses the
+            // same `Slider` State for a different parameter — its drag state,
+            // cached value and min/max then belong to the previous slider, which
+            // is exactly how dragging one bar appeared to move both.
             children: [
               if (!solid)
                 Expanded(
+                  key: const ValueKey('slot-strength'),
                   child: _ParamSlider(
+                    key: const ValueKey('param-strength'),
                     icon: Icons.opacity_rounded,
                     tooltip: l10n.strength,
                     value: controller.strength,
@@ -188,11 +196,14 @@ class _ParametersRow extends StatelessWidget {
                     onChanged: controller.setStrength,
                   ),
                 ),
-              if (!solid && strokeGeometry != null) const SizedBox(width: 10),
+              if (!solid && strokeGeometry != null)
+                const SizedBox(key: ValueKey('slot-gap'), width: 10),
               if (strokeGeometry != null)
                 Expanded(
+                  key: const ValueKey('slot-geometry'),
                   child: strokeGeometry
                       ? _ParamSlider(
+                          key: const ValueKey('param-brushSize'),
                           icon: Icons.line_weight_rounded,
                           tooltip: l10n.brushSize,
                           value: controller.brushSize,
@@ -203,6 +214,7 @@ class _ParametersRow extends StatelessWidget {
                           onChanged: controller.setBrushSize,
                         )
                       : _ParamSlider(
+                          key: const ValueKey('param-radius'),
                           icon: Icons.rounded_corner,
                           tooltip: l10n.cornerRadius,
                           value: controller.radius,
@@ -429,6 +441,7 @@ class _StyleChip extends StatelessWidget {
 /// judging the effect on the picture itself.
 class _ParamSlider extends StatelessWidget {
   const _ParamSlider({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.value,

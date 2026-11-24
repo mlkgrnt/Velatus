@@ -24,6 +24,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A README in five languages: Simplified Chinese, Traditional Chinese, English,
   Spanish and French.
 
+### Fixed
+
+- Parameter sliders work before the first mask is drawn. The setters used to
+  notify the UI only from inside the "apply to selection" helpers, so with an
+  empty document the controller changed while the thumb stood still.
+- Two sliders no longer move together. Each has a stable key, so switching
+  between brush width, corner radius and solid colour no longer recycles one
+  Slider's State — including its cached drag value — into a different parameter.
+- A stored preset outside the slider ranges is clamped when read back, so the
+  first drag does not jump. The preset is a JSON preference, not a database.
+- Picking a solid colour now refreshes the swatch even with nothing selected.
+
 ## [0.4.0] — 2026-11-24
 
 The "it should feel like a normal app" release. Everything here came from using

@@ -159,8 +159,13 @@ class EditorController extends ChangeNotifier {
 
   /// Applies to every selected region, so a multi-selection can be restyled in
   /// one go — "the new value wins" for the whole set.
-  void _applyToSelection(MaskRegion Function(MaskRegion region) change) {
-    if (_selectedIds.isEmpty) return;
+  ///
+  /// Deliberately does *not* notify: every caller is a parameter setter that
+  /// ends with one `notifyListeners()`. Notifying here as well used to mean a
+  /// slider rebuild twice per pixel when masks were selected, and — worse — no
+  /// rebuild at all before the first mask existed, so the thumb appeared stuck.
+  bool _applyToSelection(MaskRegion Function(MaskRegion region) change) {
+    if (_selectedIds.isEmpty) return false;
     var touched = false;
     for (var i = 0; i < _regions.length; i++) {
       if (!_selectedIds.contains(_regions[i].id)) continue;
@@ -170,7 +175,7 @@ class EditorController extends ChangeNotifier {
         touched = true;
       }
     }
-    if (touched) notifyListeners();
+    return touched;
   }
 
   void setTool(EditorTool value) {
@@ -220,45 +225,62 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Every parameter setter follows the same shape: change the field, remember
+  /// it, push it into any candidates/selection that exist, then notify *once*.
+  /// The notification is unconditional on purpose. Before the first mask is
+  /// drawn there is nothing selected and nothing pending, so the old code —
+  /// which only notified from inside those two helpers — left the dock showing
+  /// the previous value while the controller had already moved on. That is what
+  /// made the sliders look unusable until you drew a box first.
   void setBrushSize(double value) {
-    _brushSize = value.clamp(0.005, 0.4);
+    final next = value.clamp(0.005, 0.4).toDouble();
+    if (_brushSize == next) return;
+    _brushSize = next;
     _persistPreset();
     _applyToPending(
-      (region) => region.isStroke ? region.copyWith(size: _brushSize) : region,
+      (region) => region.isStroke ? region.copyWith(size: next) : region,
     );
     _applyToSelection(
-      (region) => region.isStroke ? region.copyWith(size: _brushSize) : region,
+      (region) => region.isStroke ? region.copyWith(size: next) : region,
     );
+    notifyListeners();
   }
 
   void setStrength(double value) {
-    _strength = value.clamp(0.02, 1.0);
+    final next = value.clamp(0.02, 1.0).toDouble();
+    if (_strength == next) return;
+    _strength = next;
     _persistPreset();
     _applyToPending(
       (region) => region.style == MaskStyle.solid
           ? region
-          : region.copyWith(strength: _strength),
+          : region.copyWith(strength: next),
     );
     _applyToSelection(
       (region) => region.style == MaskStyle.solid
           ? region
-          : region.copyWith(strength: _strength),
+          : region.copyWith(strength: next),
     );
     _warmTextures(immediate: true);
+    notifyListeners();
   }
 
   void setRadius(double value) {
-    _radius = value.clamp(0.0, 0.5);
+    final next = value.clamp(0.0, 0.5).toDouble();
+    if (_radius == next) return;
+    _radius = next;
     _persistPreset();
     _applyToPending(
-      (region) => region.isFill ? region.copyWith(radius: _radius) : region,
+      (region) => region.isFill ? region.copyWith(radius: next) : region,
     );
     _applyToSelection(
-      (region) => region.isFill ? region.copyWith(radius: _radius) : region,
+      (region) => region.isFill ? region.copyWith(radius: next) : region,
     );
+    notifyListeners();
   }
 
   void setSolidColor(Color value) {
+    if (_solidColor == value) return;
     _solidColor = value;
     _persistPreset();
     _applyToPending(
@@ -271,6 +293,9 @@ class EditorController extends ChangeNotifier {
           ? region.copyWith(color: value)
           : region,
     );
+    // The colour swatch lives in the dock too, and without this it kept showing
+    // the old colour until a mask happened to be selected.
+    notifyListeners();
   }
 
   /// Candidates follow the style controls too.
@@ -279,8 +304,8 @@ class EditorController extends ChangeNotifier {
   /// the tool had when you pressed scan, and the only way to get a round avatar
   /// mask would be to guess beforehand. No history is recorded: nothing is in
   /// the document yet.
-  void _applyToPending(MaskRegion Function(MaskRegion region) change) {
-    if (_pending.isEmpty) return;
+  bool _applyToPending(MaskRegion Function(MaskRegion region) change) {
+    if (_pending.isEmpty) return false;
     var touched = false;
     for (var i = 0; i < _pending.length; i++) {
       final next = change(_pending[i]);
@@ -289,7 +314,7 @@ class EditorController extends ChangeNotifier {
         touched = true;
       }
     }
-    if (touched) notifyListeners();
+    return touched;
   }
 
   /// Starts a drag that changes a parameter or the geometry of the selection

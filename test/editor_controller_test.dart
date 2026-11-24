@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:velatus/domain/editor_preset.dart';
 import 'package:velatus/domain/mask_region.dart';
 import 'package:velatus/features/editor/editor_controller.dart';
 import 'package:velatus/services/image_loader.dart';
@@ -277,6 +278,59 @@ void main() {
 
         expect(controller.pending.single.radius, 0.5);
         expect(controller.pending.single.style, MaskStyle.solid);
+      });
+    });
+
+    testWidgets('parameter setters notify once, even with no masks yet', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        image = await makeImage();
+        final presets = <EditorPreset>[];
+        final controller = EditorController(
+          image: image,
+          onPresetChanged: presets.add,
+        );
+        addTearDown(controller.dispose);
+
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+
+        void step(void Function() change, String label) {
+          final before = notifications;
+          change();
+          expect(notifications, before + 1, reason: label);
+        }
+
+        // Nothing drawn, nothing selected, no candidates: the dock still has
+        // to rebuild. This is the case that used to leave the thumb frozen.
+        expect(controller.hasMasks, isFalse);
+        expect(controller.hasSelection, isFalse);
+        expect(controller.hasPending, isFalse);
+        step(() => controller.setBrushSize(0.1), 'brush size');
+        step(() => controller.setStrength(0.9), 'strength');
+        step(() => controller.setRadius(0.3), 'radius');
+        step(
+          () => controller.setSolidColor(const ui.Color(0xFFFF0000)),
+          'colour',
+        );
+
+        expect(controller.brushSize, 0.1);
+        expect(controller.strength, 0.9);
+        expect(controller.radius, 0.3);
+        expect(presets.last.brushSize, 0.1);
+        expect(presets.last.strength, 0.9);
+        expect(presets.last.radius, 0.3);
+
+        // With a selection the helpers used to notify too — two rebuilds per
+        // drag pixel. One is enough.
+        controller.addRegions([
+          box('a', const ui.Rect.fromLTRB(0.1, 0.1, 0.4, 0.3)),
+        ]);
+        controller.selectAt(const ui.Offset(0.2, 0.2));
+        expect(controller.hasSelection, isTrue);
+        step(() => controller.setRadius(0.4), 'radius with a selection');
+        expect(controller.regions.single.radius, 0.4);
       });
     });
   });

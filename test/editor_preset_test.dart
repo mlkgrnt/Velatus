@@ -38,4 +38,15 @@ void main() {
     final restored = EditorPreset.fromJson({'tool': 'select'});
     expect(restored.tool, EditorTool.brush);
   });
+
+  test('out-of-range stored numbers are clamped to the slider ranges', () {
+    final restored = EditorPreset.fromJson({
+      'brushSize': 9.0,
+      'strength': -3.0,
+      'radius': 42.0,
+    });
+    expect(restored.brushSize, 0.4);
+    expect(restored.strength, 0.02);
+    expect(restored.radius, 0.5);
+  });
 }
