@@ -13,14 +13,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appName => 'Velatus';
 
   @override
-  String get appNameZh => '隐格';
-
-  @override
   String get tagline => 'Cover what should stay private.';
 
   @override
   String get taglineSub =>
-      'A local-first redaction tool for screenshots and photos.';
+      'Redact screenshots and photos without sending them anywhere.';
 
   @override
   String get cancel => 'Cancel';
@@ -69,7 +66,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureLocalBody =>
-      'No upload, no account, no tracking. The only network use is checking for updates, and you can switch that off.';
+      'Nothing is uploaded and nothing is tracked. The only reason it ever goes online is to check for updates, and you can switch that off.';
 
   @override
   String get featureLayersTitle => 'Masks you can revise';
@@ -83,7 +80,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureOcrBody =>
-      'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply — all on-device.';
+      'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply, all on this device.';
 
   @override
   String get recent => 'Recent';
@@ -137,13 +134,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get size => 'Size';
 
   @override
-  String get color => 'Color';
+  String get color => 'Colour';
 
   @override
   String get brushHint => 'Paint over anything private';
 
   @override
-  String get boxHint => 'Drag to frame an area · corners soften it';
+  String get boxHint => 'Drag to frame an area · the corner slider rounds it';
 
   @override
   String get selectHint => 'Tap a mask to adjust or delete it';
@@ -271,7 +268,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appearance => 'Appearance';
 
   @override
-  String get themeSystem => 'Follow system';
+  String get themeSystem => 'System';
 
   @override
   String get themeLight => 'Light';
@@ -283,14 +280,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get languageSystem => 'System default';
+  String get languageSystem => 'Same as system';
 
   @override
   String get privacy => 'Privacy';
 
   @override
   String get privacyBody =>
-      'Velatus processes everything on your device. There is no account, no telemetry and no image ever leaves the phone. The app has network access for one purpose only: checking for and downloading updates.';
+      'Velatus does all its work on this device and never uploads an image. Nothing is tracked. The app goes online for one thing only: checking for and downloading updates.';
 
   @override
   String get openSource => 'Open source';
@@ -317,13 +314,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get languageEnglish => 'English';
-
-  @override
-  String get languageChinese => '简体中文';
-
-  @override
-  String get apply => 'Apply';
+  String get apply => 'Confirm';
 
   @override
   String get clearAll => 'Clear all';
@@ -345,14 +336,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exifStripped => 'EXIF stripped';
 
   @override
-  String get footerNote => 'MIT · offline · no account';
+  String get footerNote => 'MIT · works offline';
 
   @override
   String get leaveTitle => 'Leave without exporting?';
 
   @override
   String get leaveBody =>
-      'This edit is not saved anywhere. Export the image first if you want to keep it.';
+      'This edit is not saved anywhere yet. Export the image first if you want to keep it.';
 
   @override
   String get leave => 'Leave';
@@ -368,7 +359,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String selectionHintMulti(int count) {
-    return '$count masks selected · corners resize only the one you grab';
+    return '$count masks selected · dragging and resizing only touch the one under your finger';
   }
 
   @override

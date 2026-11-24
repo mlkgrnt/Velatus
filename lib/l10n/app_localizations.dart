@@ -6,6 +6,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_es.dart';
+import 'app_localizations_fr.dart';
 import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
@@ -95,7 +97,10 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
+    Locale('es'),
+    Locale('fr'),
     Locale('zh'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
   /// No description provided for @appName.
@@ -103,12 +108,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Velatus'**
   String get appName;
-
-  /// No description provided for @appNameZh.
-  ///
-  /// In en, this message translates to:
-  /// **'隐格'**
-  String get appNameZh;
 
   /// No description provided for @tagline.
   ///
@@ -119,7 +118,7 @@ abstract class AppLocalizations {
   /// No description provided for @taglineSub.
   ///
   /// In en, this message translates to:
-  /// **'A local-first redaction tool for screenshots and photos.'**
+  /// **'Redact screenshots and photos without sending them anywhere.'**
   String get taglineSub;
 
   /// No description provided for @cancel.
@@ -215,7 +214,7 @@ abstract class AppLocalizations {
   /// No description provided for @featureLocalBody.
   ///
   /// In en, this message translates to:
-  /// **'No upload, no account, no tracking. The only network use is checking for updates, and you can switch that off.'**
+  /// **'Nothing is uploaded and nothing is tracked. The only reason it ever goes online is to check for updates, and you can switch that off.'**
   String get featureLocalBody;
 
   /// No description provided for @featureLayersTitle.
@@ -239,7 +238,7 @@ abstract class AppLocalizations {
   /// No description provided for @featureOcrBody.
   ///
   /// In en, this message translates to:
-  /// **'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply — all on-device.'**
+  /// **'Text, chat avatars and QR codes are suggested as boxes. You pick which ones to apply, all on this device.'**
   String get featureOcrBody;
 
   /// No description provided for @recent.
@@ -347,7 +346,7 @@ abstract class AppLocalizations {
   /// No description provided for @color.
   ///
   /// In en, this message translates to:
-  /// **'Color'**
+  /// **'Colour'**
   String get color;
 
   /// No description provided for @brushHint.
@@ -359,7 +358,7 @@ abstract class AppLocalizations {
   /// No description provided for @boxHint.
   ///
   /// In en, this message translates to:
-  /// **'Drag to frame an area · corners soften it'**
+  /// **'Drag to frame an area · the corner slider rounds it'**
   String get boxHint;
 
   /// No description provided for @selectHint.
@@ -539,7 +538,7 @@ abstract class AppLocalizations {
   /// No description provided for @themeSystem.
   ///
   /// In en, this message translates to:
-  /// **'Follow system'**
+  /// **'System'**
   String get themeSystem;
 
   /// No description provided for @themeLight.
@@ -563,7 +562,7 @@ abstract class AppLocalizations {
   /// No description provided for @languageSystem.
   ///
   /// In en, this message translates to:
-  /// **'System default'**
+  /// **'Same as system'**
   String get languageSystem;
 
   /// No description provided for @privacy.
@@ -575,7 +574,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyBody.
   ///
   /// In en, this message translates to:
-  /// **'Velatus processes everything on your device. There is no account, no telemetry and no image ever leaves the phone. The app has network access for one purpose only: checking for and downloading updates.'**
+  /// **'Velatus does all its work on this device and never uploads an image. Nothing is tracked. The app goes online for one thing only: checking for and downloading updates.'**
   String get privacyBody;
 
   /// No description provided for @openSource.
@@ -620,22 +619,10 @@ abstract class AppLocalizations {
   /// **'{width} × {height}'**
   String imageInfo(int width, int height);
 
-  /// No description provided for @languageEnglish.
-  ///
-  /// In en, this message translates to:
-  /// **'English'**
-  String get languageEnglish;
-
-  /// No description provided for @languageChinese.
-  ///
-  /// In en, this message translates to:
-  /// **'简体中文'**
-  String get languageChinese;
-
   /// No description provided for @apply.
   ///
   /// In en, this message translates to:
-  /// **'Apply'**
+  /// **'Confirm'**
   String get apply;
 
   /// No description provided for @clearAll.
@@ -677,7 +664,7 @@ abstract class AppLocalizations {
   /// No description provided for @footerNote.
   ///
   /// In en, this message translates to:
-  /// **'MIT · offline · no account'**
+  /// **'MIT · works offline'**
   String get footerNote;
 
   /// No description provided for @leaveTitle.
@@ -689,7 +676,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveBody.
   ///
   /// In en, this message translates to:
-  /// **'This edit is not saved anywhere. Export the image first if you want to keep it.'**
+  /// **'This edit is not saved anywhere yet. Export the image first if you want to keep it.'**
   String get leaveBody;
 
   /// No description provided for @leave.
@@ -719,7 +706,7 @@ abstract class AppLocalizations {
   /// No description provided for @selectionHintMulti.
   ///
   /// In en, this message translates to:
-  /// **'{count} masks selected · corners resize only the one you grab'**
+  /// **'{count} masks selected · dragging and resizing only touch the one under your finger'**
   String selectionHintMulti(int count);
 
   /// No description provided for @moreActions.
@@ -848,17 +835,33 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'zh'].contains(locale.languageCode);
+      <String>['en', 'es', 'fr', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+script codes are specified.
+  switch (locale.languageCode) {
+    case 'zh':
+      {
+        switch (locale.scriptCode) {
+          case 'Hant':
+            return AppLocalizationsZhHant();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
+    case 'fr':
+      return AppLocalizationsFr();
     case 'zh':
       return AppLocalizationsZh();
   }

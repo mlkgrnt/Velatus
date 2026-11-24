@@ -110,34 +110,40 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final name = AppLocalizations.of(context).appName;
+    // Only Chinese gets a second name. Everywhere else the app is simply
+    // Velatus, and printing "Velatus · Velatus" would look like a bug.
+    final showLatinName = name != 'Velatus';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         const VelatusBrand(size: 34, radius: 10),
         const SizedBox(width: 12),
         Text(
-          'Velatus',
+          name,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
           ),
         ),
-        const SizedBox(width: 8),
-        Container(
-          width: 3,
-          height: 3,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.outline,
-            shape: BoxShape.circle,
+        if (showLatinName) ...[
+          const SizedBox(width: 8),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.outline,
+              shape: BoxShape.circle,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '隐格',
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(width: 8),
+          Text(
+            'Velatus',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

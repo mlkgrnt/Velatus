@@ -34,4 +34,40 @@ void main() {
     expect(find.text('隐格'), findsWidgets);
     expect(find.text('打开图片'), findsWidgets);
   });
+
+  testWidgets('Traditional Chinese survives a restart, script and all', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsController();
+    await settings.load();
+    await settings.setLocale(
+      Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+    );
+
+    // Simplified and Traditional share a language code, so storing only `zh`
+    // would quietly reopen the app in Simplified.
+    final restored = SettingsController();
+    await restored.load();
+    expect(restored.locale?.scriptCode, 'Hant');
+
+    await tester.pumpWidget(VelatusApp(settings: restored));
+    await tester.pumpAndSettle();
+    expect(find.text('隱格'), findsWidgets);
+    expect(find.text('開啟圖片'), findsWidgets);
+  });
+
+  testWidgets('the Chinese name is only used in Chinese', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsController();
+    await settings.load();
+    await settings.setLocale(const Locale('fr'));
+
+    await tester.pumpWidget(VelatusApp(settings: settings));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Velatus'), findsWidgets);
+    expect(find.text('隐格'), findsNothing);
+    expect(find.text('隱格'), findsNothing);
+  });
 }

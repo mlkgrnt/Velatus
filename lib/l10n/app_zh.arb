@@ -1,9 +1,8 @@
 {
   "@@locale": "zh",
   "appName": "隐格",
-  "appNameZh": "Velatus",
   "tagline": "该藏起来的，就藏好。",
-  "taglineSub": "本地优先的截图与照片打码工具。",
+  "taglineSub": "给截图和照片打码，全程只在这台设备上完成。",
   "cancel": "取消",
   "delete": "删除",
   "done": "完成",
@@ -19,7 +18,7 @@
   "dropHint": "把图片拖到这里",
   "dropSubtitle": "或点击浏览 · 支持 JPG、PNG、WebP、BMP",
   "featureLocalTitle": "全程不出本机",
-  "featureLocalBody": "不上传、不登录、不统计。唯一的联网用途是检查更新，而且可以关掉。",
+  "featureLocalBody": "图片不会上传，也不做任何统计。唯一会联网的地方是检查更新，而且可以关掉。",
   "featureLayersTitle": "打码可以反悔",
   "featureLayersBody": "点一下就能选中某处遮挡，随时改大小或删掉，画上去的都能反悔。",
   "featureOcrTitle": "自动找出该遮的地方",
@@ -43,8 +42,8 @@
   "size": "大小",
   "color": "颜色",
   "brushHint": "在需要遮住的区域上涂抹",
-  "boxHint": "拖动框选区域 · 圆角条可软化四角",
-  "selectHint": "点选一处打码来调整或删除",
+  "boxHint": "拖动框出区域 · 圆角条可以把四角磨圆",
+  "selectHint": "点一下某处打码，就能调整或删掉",
   "deleteMask": "删除这处打码",
   "maskCount": "{count, plural, =0{暂无打码} other{{count} 处打码}}",
   "@maskCount": {
@@ -79,7 +78,7 @@
       }
     }
   },
-  "scanNone": "没有找到需要遮挡的内容",
+  "scanNone": "没找到需要遮挡的东西",
   "scanFailed": "扫描失败",
   "pendingHint": "点选要盖住的框",
   "pendingCount": "{selected}/{total}",
@@ -118,19 +117,19 @@
   "exportFailed": "保存失败",
   "exporting": "正在渲染…",
   "appearance": "外观",
-  "themeSystem": "跟随系统",
+  "themeSystem": "系统",
   "themeLight": "浅色",
   "themeDark": "深色",
   "language": "语言",
   "languageSystem": "跟随系统",
   "privacy": "隐私",
-  "privacyBody": "隐格完全在本机处理图片，没有账号、没有统计，图片永远不上传。联网权限只用在一处：检查和下载更新。",
+  "privacyBody": "隐格只在这台设备上处理图片，图片不会上传，也不做任何统计。会联网的只有一件事：检查和下载更新。",
   "openSource": "开源",
   "licenses": "开源许可",
   "aboutBody": "一个安静的小工具，专门盖住不该被看见的东西。",
-  "openFailed": "无法打开这张图片",
+  "openFailed": "打不开这张图片",
   "unsupportedFormat": "不支持的格式",
-  "storageDenied": "存储权限被拒绝",
+  "storageDenied": "存储权限被拒绝了",
   "imageInfo": "{width} × {height}",
   "@imageInfo": {
     "placeholders": {
@@ -142,23 +141,21 @@
       }
     }
   },
-  "languageEnglish": "English",
-  "languageChinese": "简体中文",
-  "apply": "落地",
+  "apply": "确认",
   "clearAll": "全部清除",
   "clearAllConfirm": "要移除这张图上的所有打码吗？",
   "maskStyle": "样式",
   "brushSize": "笔刷大小",
   "blurNote": "模糊强度会随图片尺寸缩放，导出与预览一致。",
   "exifStripped": "已清除 EXIF",
-  "footerNote": "MIT · 无联网 · 无账号",
-  "leaveTitle": "还没导出，确定离开？",
-  "leaveBody": "这次的打码不会保存。想留下结果的话，请先导出图片。",
+  "footerNote": "MIT · 离线可用",
+  "leaveTitle": "还没导出，要离开吗？",
+  "leaveBody": "这次的打码还没保存，离开就没了。想留着的话，先导出图片吧。",
   "leave": "离开",
   "cornerRadius": "圆角",
   "customColor": "颜色",
   "selectionHint": "拖动移动 · 四角缩放",
-  "selectionHintMulti": "已选 {count} 处 · 四角只缩放你碰到的那个",
+  "selectionHintMulti": "已选 {count} 处 · 拖动和缩放都只作用在你碰到的那个",
   "@selectionHintMulti": {
     "placeholders": {
       "count": {
@@ -196,7 +193,7 @@
       }
     }
   },
-  "updateInstallHint": "Android 会先让你允许「隐格」安装应用，然后弹出系统安装界面。正在编辑的内容不受影响。",
+  "updateInstallHint": "Android 会先问你是否允许「隐格」安装应用，然后弹出系统安装界面。正在编辑的内容不受影响。",
   "updateDownloaded": "已下载到 {path}",
   "@updateDownloaded": {
     "placeholders": {

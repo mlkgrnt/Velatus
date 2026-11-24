@@ -1,0 +1,220 @@
+{
+  "@@locale": "zh_Hant",
+  "appName": "隱格",
+  "tagline": "該藏起來的，就藏好。",
+  "taglineSub": "替截圖和照片打碼，全程只在這一台裝置上完成。",
+  "cancel": "取消",
+  "delete": "刪除",
+  "done": "完成",
+  "close": "關閉",
+  "save": "儲存",
+  "share": "分享",
+  "settings": "設定",
+  "about": "關於",
+  "retry": "重試",
+  "openImage": "開啟圖片",
+  "pickFromGallery": "從相簿選擇",
+  "pickFromFiles": "選擇檔案",
+  "dropHint": "把圖片拖到這裡",
+  "dropSubtitle": "或點一下瀏覽 · 支援 JPG、PNG、WebP、BMP",
+  "featureLocalTitle": "全程不出本機",
+  "featureLocalBody": "圖片不會上傳，也不做任何統計。唯一會連網的地方是檢查更新，而且可以關掉。",
+  "featureLayersTitle": "打碼可以反悔",
+  "featureLayersBody": "點一下就能選中某處遮擋，隨時改大小或刪掉，畫上去的都能反悔。",
+  "featureOcrTitle": "自動找出該遮的地方",
+  "featureOcrBody": "文字、聊天大頭貼、QR 碼都會先框出來，你自己挑要蓋哪些，全部在本機完成。",
+  "recent": "最近開啟",
+  "clearRecent": "清空",
+  "untitled": "未命名",
+  "editorTitle": "編輯",
+  "undo": "復原",
+  "redo": "重做",
+  "compare": "按住對比",
+  "export": "匯出",
+  "fitToScreen": "符合視窗",
+  "toolBrush": "塗抹",
+  "toolBox": "框",
+  "toolSelect": "選取",
+  "maskMosaic": "馬賽克",
+  "maskBlur": "模糊",
+  "maskSolid": "色塊",
+  "strength": "強度",
+  "size": "大小",
+  "color": "顏色",
+  "brushHint": "在需要遮住的區域上塗抹",
+  "boxHint": "拖曳框出區域 · 圓角條可以把四角磨圓",
+  "selectHint": "點一下某處打碼，就能調整或刪掉",
+  "deleteMask": "刪除這處打碼",
+  "maskCount": "{count, plural, =0{尚無打碼} other{{count} 處打碼}}",
+  "@maskCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanAction": "掃描",
+  "scanFoundText": "{count} 處文字",
+  "@scanFoundText": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundAvatar": "{count} 個大頭貼",
+  "@scanFoundAvatar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundQr": "{count} 個 QR 碼",
+  "@scanFoundQr": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanNone": "沒找到需要遮擋的東西",
+  "scanFailed": "掃描失敗",
+  "pendingHint": "點選要蓋住的框",
+  "pendingCount": "{selected}/{total}",
+  "@pendingCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingAll": "全選",
+  "pendingClear": "全不選",
+  "compareHint": "按住查看原圖",
+  "resetView": "重設檢視",
+  "exportTitle": "匯出",
+  "format": "格式",
+  "quality": "品質",
+  "metadata": "中繼資料",
+  "metadataNote": "EXIF（位置、裝置、時間）會被徹底移除。",
+  "resolution": "解析度",
+  "originalSize": "原始尺寸",
+  "exportSave": "存到本機",
+  "exportGallery": "存到相簿",
+  "exported": "圖片已儲存",
+  "exportedTo": "已儲存到 {path}",
+  "@exportedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "儲存失敗",
+  "exporting": "正在算圖…",
+  "appearance": "外觀",
+  "themeSystem": "系統",
+  "themeLight": "淺色",
+  "themeDark": "深色",
+  "language": "語言",
+  "languageSystem": "跟隨系統",
+  "privacy": "隱私",
+  "privacyBody": "隱格只在這一台裝置上處理圖片，圖片不會上傳，也不做任何統計。會連網的只有一件事：檢查和下載更新。",
+  "openSource": "開源",
+  "licenses": "開源授權",
+  "aboutBody": "一個安靜的小工具，專門蓋住不該被看見的東西。",
+  "openFailed": "打不開這張圖片",
+  "unsupportedFormat": "不支援的格式",
+  "storageDenied": "儲存權限被拒絕了",
+  "imageInfo": "{width} × {height}",
+  "@imageInfo": {
+    "placeholders": {
+      "width": {
+        "type": "int"
+      },
+      "height": {
+        "type": "int"
+      }
+    }
+  },
+  "apply": "確認",
+  "clearAll": "全部清除",
+  "clearAllConfirm": "要移除這張圖上的所有打碼嗎？",
+  "maskStyle": "樣式",
+  "brushSize": "筆刷大小",
+  "blurNote": "模糊強度會隨圖片尺寸縮放，匯出與預覽一致。",
+  "exifStripped": "已清除 EXIF",
+  "footerNote": "MIT · 離線可用",
+  "leaveTitle": "還沒匯出，要離開嗎？",
+  "leaveBody": "這次的打碼還沒儲存，離開就沒了。想留著的話，先匯出圖片吧。",
+  "leave": "離開",
+  "cornerRadius": "圓角",
+  "customColor": "顏色",
+  "selectionHint": "拖曳移動 · 四角縮放",
+  "selectionHintMulti": "已選 {count} 處 · 拖曳和縮放都只作用在你碰到的那個",
+  "@selectionHintMulti": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moreActions": "更多",
+  "checkUpdate": "檢查更新",
+  "checkUpdateNote": "在應用程式內下載並安裝",
+  "updateChecking": "正在檢查更新…",
+  "updateLatest": "已是最新版本（{version}）。",
+  "@updateLatest": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateAvailable": "發現新版本 {version}",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownload": "下載並安裝",
+  "updateLater": "稍後",
+  "updateDownloading": "正在下載… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateInstallHint": "Android 會先問你是否允許「隱格」安裝應用程式，然後跳出系統安裝畫面。正在編輯的內容不受影響。",
+  "updateDownloaded": "已下載到 {path}",
+  "@updateDownloaded": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "updateShowFile": "開啟所在資料夾",
+  "updateFailedCheck": "所有更新來源都連不上",
+  "updateFailedDownload": "下載失敗",
+  "updateOpenReleases": "開啟發佈頁",
+  "updateSource": "來源 {host}",
+  "@updateSource": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "repository": "原始碼",
+  "featureExportTitle": "按原圖匯出",
+  "featureExportBody": "馬賽克與模糊按原始像素重繪，不是把小圖放大。"
+}

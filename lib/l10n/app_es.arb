@@ -1,0 +1,220 @@
+{
+  "@@locale": "es",
+  "appName": "Velatus",
+  "tagline": "Tapa lo que debe quedar privado.",
+  "taglineSub": "Censura capturas y fotos sin enviarlas a ninguna parte.",
+  "cancel": "Cancelar",
+  "delete": "Borrar",
+  "done": "Listo",
+  "close": "Cerrar",
+  "save": "Guardar",
+  "share": "Compartir",
+  "settings": "Ajustes",
+  "about": "Acerca de",
+  "retry": "Reintentar",
+  "openImage": "Abrir una imagen",
+  "pickFromGallery": "Galería",
+  "pickFromFiles": "Elegir un archivo",
+  "dropHint": "Suelta una imagen aquí",
+  "dropSubtitle": "o haz clic para buscar · JPG, PNG, WebP, BMP",
+  "featureLocalTitle": "Nunca sale de tu dispositivo",
+  "featureLocalBody": "No se sube nada y no se mide nada. La única razón para conectarse es buscar actualizaciones, y puedes desactivarlo.",
+  "featureLayersTitle": "Máscaras que puedes cambiar",
+  "featureLayersBody": "Toca un bloque para seleccionarlo y luego cámbialo de tamaño o bórralo. Nada queda fijado.",
+  "featureOcrTitle": "Encuentra qué tapar",
+  "featureOcrBody": "El texto, los avatares del chat y los códigos QR aparecen como recuadros. Tú eliges cuáles aplicar, todo en el dispositivo.",
+  "recent": "Recientes",
+  "clearRecent": "Vaciar",
+  "untitled": "Sin título",
+  "editorTitle": "Editor",
+  "undo": "Deshacer",
+  "redo": "Rehacer",
+  "compare": "Mantén para comparar",
+  "export": "Exportar",
+  "fitToScreen": "Ajustar a la pantalla",
+  "toolBrush": "Pincel",
+  "toolBox": "Recuadro",
+  "toolSelect": "Seleccionar",
+  "maskMosaic": "Mosaico",
+  "maskBlur": "Desenfoque",
+  "maskSolid": "Color",
+  "strength": "Intensidad",
+  "size": "Tamaño",
+  "color": "Color",
+  "brushHint": "Pinta encima de lo que quieras ocultar",
+  "boxHint": "Arrastra para encuadrar · el control de esquina redondea",
+  "selectHint": "Toca una máscara para ajustarla o borrarla",
+  "deleteMask": "Borrar máscara",
+  "maskCount": "{count, plural, =0{Sin máscaras} =1{1 máscara} other{{count} máscaras}}",
+  "@maskCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanAction": "Escanear",
+  "scanFoundText": "{count, plural, =1{1 bloque de texto} other{{count} bloques de texto}}",
+  "@scanFoundText": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundAvatar": "{count, plural, =1{1 avatar} other{{count} avatares}}",
+  "@scanFoundAvatar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanFoundQr": "{count, plural, =1{1 código QR} other{{count} códigos QR}}",
+  "@scanFoundQr": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanNone": "No se encontró nada que valga la pena tapar",
+  "scanFailed": "El escaneo falló",
+  "pendingHint": "Toca los recuadros que quieras tapar",
+  "pendingCount": "{selected}/{total}",
+  "@pendingCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingAll": "Todos",
+  "pendingClear": "Ninguno",
+  "compareHint": "Mantén para ver el original",
+  "resetView": "Restablecer vista",
+  "exportTitle": "Exportar",
+  "format": "Formato",
+  "quality": "Calidad",
+  "metadata": "Metadatos",
+  "metadataNote": "Los datos EXIF (GPS, dispositivo, fecha) se eliminan siempre.",
+  "resolution": "Resolución",
+  "originalSize": "Original",
+  "exportSave": "Guardar en el dispositivo",
+  "exportGallery": "Guardar en la galería",
+  "exported": "Imagen guardada",
+  "exportedTo": "Guardada en {path}",
+  "@exportedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "No se pudo guardar la imagen",
+  "exporting": "Procesando…",
+  "appearance": "Apariencia",
+  "themeSystem": "Sistema",
+  "themeLight": "Claro",
+  "themeDark": "Oscuro",
+  "language": "Idioma",
+  "languageSystem": "Igual que el sistema",
+  "privacy": "Privacidad",
+  "privacyBody": "Velatus hace todo el trabajo en este dispositivo y nunca sube una imagen. No se mide nada. La aplicación se conecta por una sola cosa: buscar y descargar actualizaciones.",
+  "openSource": "Código abierto",
+  "licenses": "Licencias de código abierto",
+  "aboutBody": "Una herramienta discreta para tapar lo que no debería verse.",
+  "openFailed": "No se pudo abrir esta imagen",
+  "unsupportedFormat": "Formato no compatible",
+  "storageDenied": "Se denegó el permiso de almacenamiento",
+  "imageInfo": "{width} × {height}",
+  "@imageInfo": {
+    "placeholders": {
+      "width": {
+        "type": "int"
+      },
+      "height": {
+        "type": "int"
+      }
+    }
+  },
+  "apply": "Confirmar",
+  "clearAll": "Borrar todo",
+  "clearAllConfirm": "¿Quitar todas las máscaras de esta imagen?",
+  "maskStyle": "Estilo",
+  "brushSize": "Grosor del pincel",
+  "blurNote": "La intensidad del desenfoque se ajusta a la imagen, así que el archivo exportado se ve igual que la vista previa.",
+  "exifStripped": "EXIF eliminado",
+  "footerNote": "MIT · funciona sin conexión",
+  "leaveTitle": "¿Salir sin exportar?",
+  "leaveBody": "Este trabajo aún no está guardado en ninguna parte. Exporta la imagen primero si quieres conservarlo.",
+  "leave": "Salir",
+  "cornerRadius": "Radio de esquina",
+  "customColor": "Color",
+  "selectionHint": "Arrastra para mover · las esquinas cambian el tamaño",
+  "selectionHintMulti": "{count} máscaras seleccionadas · arrastrar y redimensionar solo afectan a la que tocas",
+  "@selectionHintMulti": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moreActions": "Más",
+  "checkUpdate": "Buscar actualizaciones",
+  "checkUpdateNote": "Se descarga e instala dentro de la app",
+  "updateChecking": "Buscando actualizaciones…",
+  "updateLatest": "Ya tienes la última versión ({version}).",
+  "@updateLatest": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateAvailable": "La versión {version} ya está disponible",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownload": "Descargar e instalar",
+  "updateLater": "Más tarde",
+  "updateDownloading": "Descargando… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateInstallHint": "Android te pedirá permiso para instalar aplicaciones desde Velatus y luego mostrará su propia pantalla de instalación. Tu edición no se ve afectada.",
+  "updateDownloaded": "Guardado en {path}",
+  "@updateDownloaded": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "updateShowFile": "Mostrar archivo",
+  "updateFailedCheck": "No se pudo conectar con ningún servidor de actualizaciones",
+  "updateFailedDownload": "La descarga falló",
+  "updateOpenReleases": "Abrir la página de versiones",
+  "updateSource": "vía {host}",
+  "@updateSource": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "repository": "Código fuente",
+  "featureExportTitle": "Salida a resolución completa",
+  "featureExportBody": "Las máscaras se redibujan sobre los píxeles originales, no se amplían desde la vista previa."
+}

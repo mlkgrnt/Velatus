@@ -6,6 +6,45 @@ import '../../core/settings_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'widgets/update_dialog.dart';
 
+/// One entry of the language picker.
+///
+/// Languages are listed in their own words — someone who needs 繁體中文 should
+/// not have to find it under an English label.
+class _LanguageOption {
+  const _LanguageOption(this.tag, this.label, this.locale);
+
+  final String tag;
+  final String label;
+  final Locale? locale;
+}
+
+final List<_LanguageOption> _languageOptions = <_LanguageOption>[
+  const _LanguageOption('zh', '简体中文', Locale('zh')),
+  _LanguageOption(
+    'zh_Hant',
+    '繁體中文',
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+  ),
+  const _LanguageOption('en', 'English', Locale('en')),
+  const _LanguageOption('es', 'Español', Locale('es')),
+  const _LanguageOption('fr', 'Français', Locale('fr')),
+];
+
+String _tagOf(Locale locale) {
+  final script = locale.scriptCode;
+  return script == null || script.isEmpty
+      ? locale.languageCode
+      : '${locale.languageCode}_$script';
+}
+
+String _labelOf(Locale locale) {
+  final tag = _tagOf(locale);
+  for (final option in _languageOptions) {
+    if (option.tag == tag) return option.label;
+  }
+  return locale.languageCode;
+}
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.settings});
 
@@ -21,6 +60,9 @@ class SettingsPage extends StatelessWidget {
       body: ListenableBuilder(
         listenable: settings,
         builder: (context, _) {
+          // Read inside the builder: the row has to follow the picker, and the
+          // outer build does not run again when a setting changes.
+          final locale = settings.locale;
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
@@ -55,55 +97,15 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 24),
               _SectionLabel(l10n.language),
               SoftCard(
-                child: RadioGroup<String>(
-                  groupValue: settings.locale?.languageCode ?? 'system',
-                  onChanged: (value) {
-                    if (value == null) return;
-                    settings.setLocale(value == 'system' ? null : Locale(value));
-                  },
-                  child: Column(
-                    children: [
-                      RadioListTile<String>(
-                        value: 'system',
-                        title: Text(l10n.languageSystem),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      RadioListTile<String>(
-                        value: 'zh',
-                        title: Text(l10n.languageChinese),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      RadioListTile<String>(
-                        value: 'en',
-                        title: Text(l10n.languageEnglish),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _SectionLabel(l10n.privacy),
-              SoftCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.lock_outline_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        l10n.privacyBody,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.6,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: _LinkRow(
+                  icon: Icons.translate_rounded,
+                  title: l10n.language,
+                  subtitle: locale == null
+                      ? l10n.languageSystem
+                      : _labelOf(locale),
+                  external: false,
+                  onTap: () => _pickLanguage(context, l10n, settings),
                 ),
               ),
               const SizedBox(height: 24),
@@ -115,14 +117,14 @@ class SettingsPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const VelatusBrand(size: 52, radius: 16),
+                        const VelatusBrand(size: 52, radius: 15),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${l10n.appName} · Velatus',
+                                _appTitle(l10n.appName),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -191,11 +193,36 @@ class SettingsPage extends StatelessWidget {
                         child: TextButton.icon(
                           onPressed: () => showLicensePage(
                             context: context,
-                            applicationName: 'Velatus',
+                            applicationName: l10n.appName,
                             applicationVersion: kAppVersion,
                           ),
                           icon: const Icon(Icons.article_outlined, size: 18),
                           label: Text(l10n.licenses),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Last, and deliberately so: this is a statement, not a setting.
+              const SizedBox(height: 24),
+              _SectionLabel(l10n.privacy),
+              SoftCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        l10n.privacyBody,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.6,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -207,6 +234,64 @@ class SettingsPage extends StatelessWidget {
         },
       ),
     );
+  }
+
+  /// "Velatus" on its own outside Chinese, "隐格 · Velatus" inside it.
+  static String _appTitle(String name) =>
+      name == 'Velatus' ? 'Velatus' : '$name · Velatus';
+
+  Future<void> _pickLanguage(
+    BuildContext context,
+    AppLocalizations l10n,
+    SettingsController settings,
+  ) async {
+    final current = settings.locale;
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.language),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          content: RadioGroup<String>(
+            groupValue: current == null ? 'system' : _tagOf(current),
+            onChanged: (value) {
+              if (value != null) Navigator.of(dialogContext).pop(value);
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    value: 'system',
+                    title: Text(l10n.languageSystem),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  for (final option in _languageOptions)
+                    RadioListTile<String>(
+                      value: option.tag,
+                      title: Text(option.label),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    if (selected == 'system') {
+      await settings.setLocale(null);
+      return;
+    }
+    for (final option in _languageOptions) {
+      if (option.tag == selected) {
+        await settings.setLocale(option.locale);
+        return;
+      }
+    }
   }
 
   void _toast(BuildContext context, String text) {
@@ -293,8 +378,8 @@ class _LinkRow extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  /// Whether the row leaves the app. The update check does not, so it gets a
-  /// chevron instead of the "opens a browser" arrow.
+  /// Whether the row leaves the app. The update check and the language picker
+  /// do not, so they get a chevron instead of the "opens a browser" arrow.
   final bool external;
 
   @override
